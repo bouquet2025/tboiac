@@ -59,6 +59,11 @@ local function keyTriggered(key)
     return edge("k" .. key, keyPressed(key))
 end
 
+-- Public edge check for a keyboard key (used by rule hotkeys).
+function input.keyEdge(key)
+    return keyTriggered(key)
+end
+
 local function padTriggered(button)
     local hit = false
     for _, idx in ipairs(controllers()) do

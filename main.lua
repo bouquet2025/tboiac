@@ -5,7 +5,7 @@ local mod = RegisterMod("TBOIAC", 1)
 
 TBOIAC = {
     mod = mod,
-    version = "0.1.0",
+    version = "0.2.0",
     game = Game(),
     hasRepentogon = REPENTOGON ~= nil,
 }
@@ -16,6 +16,7 @@ local function load(path)
 end
 
 AC.util = load("core.util")
+AC.data = load("data.game")
 AC.i18n = load("core.i18n")
 AC.save = load("core.save")
 AC.input = load("core.input")
@@ -23,6 +24,14 @@ AC.render = load("core.render")
 AC.menu = load("core.menu")
 AC.catalog = load("core.catalog")
 AC.registry = load("core.registry")
+
+AC.ruleParams = load("rules.params")
+AC.rules = load("rules.engine")
+AC.ruleEvents = load("rules.events")
+load("rules.conditions")
+load("rules.actions")
+AC.rulePresets = load("rules.presets")
+AC.registry.register(load("rules.editor"))
 
 local features = {
     "player",

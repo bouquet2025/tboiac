@@ -26,17 +26,7 @@ local function each(fn)
     end
 end
 
--- Characters offered in the menu: { PlayerType, i18n-free display name }.
-local CHARACTERS = {
-    { 0, "Isaac" }, { 1, "Magdalene" }, { 2, "Cain" }, { 3, "Judas" }, { 4, "???" }, { 5, "Eve" },
-    { 6, "Samson" }, { 7, "Azazel" }, { 8, "Lazarus" }, { 9, "Eden" }, { 10, "The Lost" },
-    { 13, "Lilith" }, { 14, "Keeper" }, { 15, "Apollyon" }, { 16, "The Forgotten" }, { 18, "Bethany" },
-    { 19, "Jacob & Esau" },
-    { 21, "T. Isaac" }, { 22, "T. Magdalene" }, { 23, "T. Cain" }, { 24, "T. Judas" }, { 25, "T. ???" },
-    { 26, "T. Eve" }, { 27, "T. Samson" }, { 28, "T. Azazel" }, { 29, "T. Lazarus" }, { 30, "T. Eden" },
-    { 31, "T. Lost" }, { 32, "T. Lilith" }, { 33, "T. Keeper" }, { 34, "T. Apollyon" },
-    { 35, "T. Forgotten" }, { 36, "T. Bethany" }, { 37, "T. Jacob" },
-}
+local CHARACTERS = AC.data.CHARACTERS
 
 local HEARTS = {
     { "h_container", function(p, n) p:AddMaxHearts(2 * n) end },

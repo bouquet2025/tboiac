@@ -25,6 +25,27 @@ local function obj(members)
     return setmetatable(members or {}, { __index = function() return function() return Any end end })
 end
 
+-- Object whose unknown methods are reported (names from the real API listed in `known`).
+local function strictObj(members, known)
+    local ok = {}
+    for _, name in ipairs(known) do ok[name] = true end
+    return setmetatable(members, { __index = function(_, k)
+        if not ok[k] then fail("unknown API member " .. tostring(k)) end
+        return function() return Any end
+    end })
+end
+
+local PLAYER_API = { "AddCollectible", "RemoveCollectible", "HasCollectible", "GetCollectibleNum",
+    "GetCollectibleCount", "AddTrinket", "TryRemoveTrinket", "GetTrinket", "HasTrinket", "UseActiveItem",
+    "UseCard", "UsePill", "AddMaxHearts", "AddHearts", "AddSoulHearts", "AddBlackHearts", "AddBoneHearts",
+    "AddGoldenHearts", "AddEternalHearts", "AddRottenHearts", "AddBrokenHearts", "SetFullHearts", "GetHearts",
+    "GetSoulHearts", "GetBoneHearts", "AddCoins", "AddBombs", "AddKeys", "GetNumCoins", "GetNumBombs",
+    "GetNumKeys", "AddGoldenBomb", "AddGoldenKey", "ChangePlayerType", "GetPlayerType", "Revive", "Kill",
+    "Die", "IsDead", "TakeDamage", "AddCacheFlags", "EvaluateItems", "GetActiveItem", "NeedsCharge",
+    "FullCharge", "GetData", "ToPlayer", "ToNPC", "ToPickup", "ToProjectile", "Exists", "Remove",
+    "AddVelocity", "GetName", "AddEntityFlags", "HasEntityFlags", "ClearEntityFlags", "GetSprite", "SetColor",
+    "GridCollisionClass" }
+
 -- Strict enum: unknown names are reported.
 local function enum(name, values)
     return setmetatable(values, {
@@ -33,7 +54,9 @@ local function enum(name, values)
 end
 
 local function vec(x, y)
-    return setmetatable({ X = x, Y = y }, {
+    return setmetatable({ X = x, Y = y,
+        Distance = function(a, b) return math.sqrt((a.X - b.X) ^ 2 + (a.Y - b.Y) ^ 2) end,
+        Normalized = function(a) return vec(1, 0) end }, {
         __add = function(a, b) return vec(a.X + b.X, a.Y + b.Y) end,
         __sub = function(a, b) return vec(a.X - b.X, a.Y - b.Y) end,
         __mul = function(a, b)
@@ -57,6 +80,8 @@ local keyboard = { KEY_SPACE = 32, KEY_APOSTROPHE = 39, KEY_MINUS = 45, KEY_PERI
     KEY_DOWN = 264, KEY_UP = 265, KEY_HOME = 268, KEY_KP_0 = 320, KEY_KP_9 = 329, KEY_KP_ENTER = 335,
     KEY_LEFT_SHIFT = 340, KEY_RIGHT_SHIFT = 344 }
 for i = 1, 12 do keyboard["KEY_F" .. i] = 289 + i end
+for c = 65, 90 do keyboard["KEY_" .. string.char(c)] = c end
+for d = 0, 9 do keyboard["KEY_" .. d] = 48 + d; keyboard["KEY_KP_" .. d] = 320 + d end
 Keyboard = enum("Keyboard", keyboard)
 Controller = enum("Controller", { DPAD_LEFT = 0, DPAD_RIGHT = 1, DPAD_UP = 2, DPAD_DOWN = 3,
     BUTTON_A = 4, BUTTON_B = 5, BUTTON_X = 6, BUTTON_Y = 7, BUMPER_LEFT = 8, TRIGGER_LEFT = 9,
@@ -68,11 +93,13 @@ ButtonAction = enum("ButtonAction", { ACTION_LEFT = 0, ACTION_RIGHT = 1, ACTION_
 InputHook = enum("InputHook", { IS_ACTION_PRESSED = 0, IS_ACTION_TRIGGERED = 1, GET_ACTION_VALUE = 2 })
 local callbackNames = { "MC_POST_RENDER", "MC_INPUT_ACTION", "MC_POST_GAME_STARTED", "MC_PRE_GAME_EXIT",
     "MC_ENTITY_TAKE_DMG", "MC_EVALUATE_CACHE", "MC_POST_PEFFECT_UPDATE", "MC_POST_UPDATE",
-    "MC_POST_NEW_ROOM", "MC_NPC_UPDATE", "MC_POST_CURSE_EVAL" }
+    "MC_POST_NEW_ROOM", "MC_NPC_UPDATE", "MC_POST_CURSE_EVAL", "MC_POST_NEW_LEVEL", "MC_POST_NPC_DEATH",
+    "MC_POST_PICKUP_UPDATE", "MC_USE_ITEM", "MC_USE_CARD", "MC_USE_PILL", "MC_POST_FIRE_TEAR" }
 local cbEnum = {}
 for i, n in ipairs(callbackNames) do cbEnum[n] = i end
 ModCallbacks = enum("ModCallbacks", cbEnum)
 EntityType = enum("EntityType", { ENTITY_PLAYER = 1, ENTITY_PICKUP = 5, ENTITY_EFFECT = 1000 })
+vec(0, 0) -- ensure metatable-created vectors exist before use
 EntityFlag = enum("EntityFlag", { FLAG_FREEZE = 1, FLAG_FRIENDLY = 2, FLAG_PERSISTENT = 4 })
 EntityGridCollisionClass = enum("EntityGridCollisionClass", { GRIDCOLL_NONE = 0, GRIDCOLL_GROUND = 5 })
 CacheFlag = enum("CacheFlag", { CACHE_DAMAGE = 1, CACHE_FIREDELAY = 2, CACHE_SHOTSPEED = 4, CACHE_RANGE = 8,
@@ -105,7 +132,7 @@ EffectVariant = enum("EffectVariant", { HEAVEN_LIGHT_DOOR = 39 })
 
 -- Game objects
 local playerData = {}
-local player = obj({
+local player = strictObj({
     Position = vec(100, 100), ControllerIndex = 0, Damage = 3.5, MaxFireDelay = 10, MoveSpeed = 1,
     TearRange = 260, ShotSpeed = 1, Luck = 0, CanFly = false, SpriteScale = vec(1, 1),
     GetNumCoins = function() return 5 end, GetNumBombs = function() return 1 end,
@@ -113,8 +140,11 @@ local player = obj({
     GetActiveItem = function() return 0 end, GetTrinket = function() return 0 end,
     HasCollectible = function(_, id) return id == 1 end, GetCollectibleNum = function(_, id) return id == 1 and 1 or 0 end,
     GetPlayerType = function() return 0 end, IsDead = function() return false end,
-    ToPlayer = function(self) return self end,
-})
+    ToPlayer = function(self) return self end, ToNPC = function() return nil end, Exists = function() return true end,
+    GetHearts = function() return 6 end, GetSoulHearts = function() return 2 end, GetBoneHearts = function() return 0 end,
+    GetCollectibleCount = function() return 3 end, HasTrinket = function() return false end,
+    QueuedItem = { Item = obj({ ID = 7, IsCollectible = function() return true end }) }, Type = 1,
+}, PLAYER_API)
 local npcData = {}
 local npc = obj({
     Position = vec(0, 0), Velocity = vec(0, 0), MaxHitPoints = 10, HitPoints = 10,
@@ -122,15 +152,24 @@ local npc = obj({
     ToProjectile = function() return nil end, ToPlayer = function() return nil end,
     IsVulnerableEnemy = function() return true end, IsDead = function() return false end,
     HasEntityFlags = function() return false end, IsBoss = function() return false end,
-    IsChampion = function() return false end,
+    IsChampion = function() return false end, Exists = function() return true end,
+    GetSprite = function() return obj({ IsPlaying = function() return true end }) end,
+    ToPickup = function() return nil end, Type = 10, Variant = 0, SubType = 0,
 })
+local pickup = obj({ Type = 5, Variant = 100, SubType = 3, Position = vec(0, 0), Velocity = vec(0, 0),
+    GetData = function() return {} end, ToNPC = function() return nil end, Exists = function() return true end,
+    ToPickup = function(self) return self end, ToPlayer = function() return nil end,
+    GetSprite = function() return obj({ IsPlaying = function() return true end }) end })
 local proj = obj({ Velocity = vec(1, 1), FallingSpeed = 1, FallingAccel = 0.1, GetData = function() return {} end,
     ToNPC = function() return nil end, ToProjectile = function(self) return self end })
 local roomDesc = obj({ SafeGridIndex = 45, Clear = false, Data = { Type = 4 } })
 local rooms = obj({ Size = 2, Get = function() return roomDesc end })
 local level = obj({ GetRooms = function() return rooms end, GetCurses = function() return 1 end,
+    GetStage = function() return 3 end,
     GetStartingRoomIndex = function() return 84 end, GetCurrentRoomIndex = function() return 84 end })
 local room = obj({ GetGridSize = function() return 3 end, GetDoor = function() return nil end,
+    GetType = function() return 5 end, IsFirstVisit = function() return true end, IsClear = function() return false end,
+    GetRandomPosition = function() return vec(10, 10) end, GetCenterPos = function() return vec(20, 20) end,
     GetGridEntity = function() return nil end, FindFreeTilePosition = function() return vec(0, 0) end,
     FindFreePickupSpawnPosition = function() return vec(0, 0) end })
 local game = obj({ GetNumPlayers = function() return 1 end, GetLevel = function() return level end,
@@ -169,10 +208,12 @@ Isaac = {
     FindByType = function() return { obj({ Variant = 10, Position = vec(0, 0) }) } end,
     GetFreeNearPosition = function(p) return p end,
     ExecuteCommand = function() return "" end,
+    Explode = function() end,
 }
 Font = function() return obj({ IsLoaded = function() return true end, GetLineHeight = function() return 10 end,
     GetStringWidthUTF8 = function(_, s) return #s * 5 end }) end
 Sprite = function() return obj() end
+SFXManager = function() return obj() end
 
 RegisterMod = function(name)
     return {
@@ -244,6 +285,17 @@ AC.render.toast = function(msg, ...)
     return toast(msg, ...)
 end
 
+-- A rule using every condition and action, so the editor traversal reaches all their pages.
+do
+    local E = AC.rules
+    local r = E.newRule("entity_killed")
+    r.filter.mode = "exact"
+    r.scope = "chapter"
+    for _, id in ipairs(E.conditionOrder) do r.conds[#r.conds + 1] = { id = id, p = E.defaults(E.conditions[id]) } end
+    for _, id in ipairs(E.actionOrder) do r.acts[#r.acts + 1] = { id = id, p = E.defaults(E.actions[id]), delay = 1 } end
+    AC.save.data.rules.enabled = false -- keep the traversal from firing rules
+end
+
 for _, lang in ipairs({ "ru", "en" }) do
     AC.save.data.ui.lang = lang
     -- Open the menu and press every widget on every page reachable from root.
@@ -255,18 +307,24 @@ for _, lang in ipairs({ "ru", "en" }) do
     frame({ Keyboard.KEY_F2 })
     assert(not AC.menu.open, "menu did not close")
     frame()
-    local visited = {}
-    -- Re-open the menu along `path` (list of page ids) so every press starts from a known state.
+    local visited, pages = {}, 0
+    -- Re-open the menu along `path` (page ids or page tables) so every press starts from a known state.
     local function ensure(path)
         AC.menu.setOpen(true)
         for i = 2, #path do AC.menu.push(path[i]) end
         return AC.menu.stack[#AC.menu.stack]
     end
-    local function visit(path)
-        local id = path[#path]
-        if visited[id] then return end
-        visited[id] = true
+    local function titleOf(page)
+        local title = page.title
+        if type(title) == "function" then title = title() end
+        return tostring(title)
+    end
+    local function visit(path, trail)
         local f = ensure(path)
+        local id = trail .. "/" .. titleOf(f.page)
+        if visited[id] or #path > 8 then return end
+        visited[id] = true
+        pages = pages + 1
         for i, item in ipairs(f.items) do
             if type(item.label) ~= "string" then fail(id .. ": label is not a string at " .. i) end
         end
@@ -277,12 +335,14 @@ for _, lang in ipairs({ "ru", "en" }) do
                 f.cursor = i
                 if item.kind == "page" then
                     local target = type(item.page) == "function" and item.page() or item.page
-                    local tid = type(target) == "table" and target.id or target
-                    if not AC.menu.pages[tid] then fail(id .. ": link to unknown page " .. tostring(tid)) end
-                    local sub = {}
-                    for k, v in ipairs(path) do sub[k] = v end
-                    sub[#sub + 1] = tid
-                    visit(sub)
+                    if type(target) == "string" and not AC.menu.pages[target] then
+                        fail(id .. ": link to unknown page " .. target)
+                    elseif target then
+                        local sub = {}
+                        for k, v in ipairs(path) do sub[k] = v end
+                        sub[#sub + 1] = target
+                        visit(sub, id)
+                    end
                 elseif item.kind == "text" then
                     local before = item.get()
                     frame({ Keyboard.KEY_ENTER }); frame()
@@ -297,10 +357,8 @@ for _, lang in ipairs({ "ru", "en" }) do
             end
         end
     end
-    visit({ "root" })
-    local n = 0
-    for _ in pairs(visited) do n = n + 1 end
-    print(lang .. ": visited " .. n .. " pages")
+    visit({ "root" }, lang)
+    print(lang .. ": visited " .. pages .. " pages, rules now: " .. #AC.save.data.rules.list)
     AC.menu.setOpen(false)
 end
 
@@ -339,6 +397,85 @@ fire("MC_ENTITY_TAKE_DMG", player, 1, 0, Any, 0)
 fire("MC_NPC_UPDATE", npc)
 fire("MC_POST_CURSE_EVAL", 1)
 fire("MC_INPUT_ACTION", player, 0, 0)
+-- Rules engine: every event through the real callbacks, then every condition and action directly.
+AC.save.data.rules.enabled = true
+for _, preset in ipairs(AC.rulePresets.list) do AC.rulePresets.apply(preset) end
+local E = AC.rules
+for _, id in ipairs(E.eventOrder) do
+    local r = E.newRule(id)
+    r.acts = { { id = "counter", p = { name = "hits_" .. id, op = "add", value = 1 }, delay = 0 } }
+end
+AC.save.write() -- MC_POST_GAME_STARTED reloads settings from the save
+fire("MC_POST_GAME_STARTED", false)
+fire("MC_POST_NEW_LEVEL")
+fire("MC_POST_NEW_ROOM")
+for _ = 1, 400 do fire("MC_POST_UPDATE") end
+fire("MC_POST_PEFFECT_UPDATE", player)
+fire("MC_ENTITY_TAKE_DMG", npc, 1, 0, Any, 0)
+d.player.god = false
+fire("MC_ENTITY_TAKE_DMG", player, 1, 0, Any, 0)
+fire("MC_POST_NPC_DEATH", npc)
+npcData.tboiacRuleSeen, npcData.tboiacByRule = nil, nil
+playerData.tboiacQueued = nil
+fire("MC_POST_PEFFECT_UPDATE", player)
+fire("MC_NPC_UPDATE", npc)
+fire("MC_POST_PICKUP_UPDATE", pickup)
+fire("MC_USE_ITEM", 105, Any, player)
+fire("MC_USE_CARD", 1, player)
+fire("MC_USE_PILL", 1, player)
+fire("MC_POST_FIRE_TEAR", obj({ SpawnerEntity = player, GetData = function() return {} end }))
+pressed = { [Keyboard.KEY_K] = true }
+fire("MC_POST_RENDER")
+pressed = {}
+for _, id in ipairs({ "run_start", "new_floor", "room_enter", "timer", "player_hurt", "enemy_hurt",
+    "entity_killed", "entity_spawned", "pickup_spawned", "pickup_collected", "item_picked", "active_used",
+    "card_used", "pill_used", "tear_fired", "key_press" }) do
+    if E.counter("hits_" .. id) < 1 then fail("rule event never fired: " .. id) end
+end
+-- Param sets: defaults, plus one variant per option of every choice param.
+local function variants(def)
+    local list = { E.defaults(def) }
+    for _, spec in ipairs(def.params) do
+        if spec.kind == "choice" then
+            local opts = type(spec.options) == "function" and spec.options() or spec.options
+            for _, o in ipairs(opts) do
+                local p = E.defaults(def)
+                p[spec.key] = o[2]
+                list[#list + 1] = p
+            end
+        elseif spec.kind == "toggle" then
+            local p = E.defaults(def)
+            p[spec.key] = not spec.default
+            list[#list + 1] = p
+        end
+    end
+    return list
+end
+for _, id in ipairs(E.conditionOrder) do
+    for _, p in ipairs(variants(E.conditions[id])) do
+        local ok, err = pcall(E.checkCondition, { id = id, p = p }, { entity = npc, player = player }, { id = 1 })
+        if not ok then fail("condition " .. id .. ": " .. tostring(err)) end
+    end
+end
+for _, id in ipairs(E.actionOrder) do
+    for _, p in ipairs(variants(E.actions[id])) do
+        for _, ent in ipairs({ npc, pickup }) do
+            E.runAction({ id = id, p = p }, { entity = ent, player = player }, { id = 1 })
+        end
+        E.runAction({ id = id, p = p }, { player = player }, { id = 1 })
+    end
+end
+for _, def in pairs(E.actions) do
+    for _, spec in ipairs(def.params) do
+        if spec.default == nil then fail("action " .. def.id .. " param " .. spec.key .. " has no default") end
+    end
+end
+-- Loop guard: a rule that re-triggers itself must be capped.
+local loop = E.newRule("entity_killed")
+loop.acts = { { id = "counter", p = { name = "loop", op = "add", value = 1 } } }
+for _ = 1, 500 do E.emit("entity_killed", { entity = npc }) end
+if E.counter("loop") > E.MAX_FIRES_PER_FRAME then fail("loop guard did not cap fires") end
+
 AC.registry.resetAll()
 fire("MC_POST_UPDATE")
 fire("MC_PRE_GAME_EXIT", true)
@@ -346,7 +483,7 @@ assert(saved, "settings were not saved")
 AC.save.load()
 
 for _, line in ipairs(debugLog) do
-    if line:find("error") then fail("log: " .. line) end
+    if line:find("error") or line:find("failed") then fail("log: " .. line) end
 end
 
 if #errors > 0 then

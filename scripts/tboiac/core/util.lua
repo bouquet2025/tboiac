@@ -94,6 +94,28 @@ function util.trinketName(id)
     return cfg and util.prettyName(cfg.Name) or nil
 end
 
+function util.cardName(id)
+    local cfg = Isaac.GetItemConfig():GetCard(id)
+    return cfg and util.prettyName(cfg.Name) or nil
+end
+
+function util.pillName(id)
+    local cfg = Isaac.GetItemConfig():GetPillEffect(id)
+    return cfg and util.prettyName(cfg.Name) or nil
+end
+
+-- Searchable catalogs shared by the item menus and rule editor.
+util.catalogs = {
+    collectible = { name = function(id) return util.collectibleName(id) end,
+                    ids = function() return 1, util.maxCollectible() end },
+    trinket = { name = function(id) return util.trinketName(id) end,
+                ids = function() return 1, util.maxTrinket() end },
+    card = { name = function(id) return util.cardName(id) end,
+             ids = function() return 1, Isaac.GetItemConfig():GetCards().Size - 1 end },
+    pill = { name = function(id) return util.pillName(id) end,
+             ids = function() return 0, Isaac.GetItemConfig():GetPillEffects().Size - 1 end },
+}
+
 function util.maxCollectible()
     return Isaac.GetItemConfig():GetCollectibles().Size - 1
 end
@@ -105,6 +127,28 @@ end
 function util.command(cmd)
     util.log("command: " .. cmd)
     return Isaac.ExecuteCommand(cmd)
+end
+
+function util.roomTypeName(rtype)
+    for _, r in ipairs(AC.data.ROOM_TYPES) do
+        if r[2] == rtype then return AC.i18n.t(r[1]) end
+    end
+    return AC.i18n.t("rt_other", rtype)
+end
+
+function util.teleport(index)
+    AC.menu.setOpen(false)
+    AC.game:StartRoomTransition(index, Direction.NO_DIRECTION, RoomTransitionAnim.TELEPORT)
+end
+
+-- Safe grid index of the first room of `rtype` on this floor, or nil.
+function util.findRoom(rtype)
+    local rooms = AC.game:GetLevel():GetRooms()
+    for i = 0, rooms.Size - 1 do
+        local desc = rooms:Get(i)
+        if desc.Data and desc.Data.Type == rtype then return desc.SafeGridIndex end
+    end
+    return nil
 end
 
 return util

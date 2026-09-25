@@ -4,66 +4,10 @@ local menu, util = AC.menu, AC.util
 local t = function(...) return AC.i18n.t(...) end
 
 local feature = { id = "world", label = "m_world" }
+local ROOM_TYPES, STAGES, CURSES = AC.data.ROOM_TYPES, AC.data.STAGES, AC.data.CURSES
+local teleport, findRoom, roomTypeName = util.teleport, util.findRoom, util.roomTypeName
 
-local state = { stage = 1, stageType = "", command = "", layout = "" }
-
-local ROOM_TYPES = {
-    { "rt_default", RoomType.ROOM_DEFAULT }, { "rt_treasure", RoomType.ROOM_TREASURE },
-    { "rt_shop", RoomType.ROOM_SHOP }, { "rt_boss", RoomType.ROOM_BOSS },
-    { "rt_miniboss", RoomType.ROOM_MINIBOSS }, { "rt_secret", RoomType.ROOM_SECRET },
-    { "rt_supersecret", RoomType.ROOM_SUPERSECRET }, { "rt_ultrasecret", RoomType.ROOM_ULTRASECRET },
-    { "rt_arcade", RoomType.ROOM_ARCADE }, { "rt_curse", RoomType.ROOM_CURSE },
-    { "rt_challenge", RoomType.ROOM_CHALLENGE }, { "rt_library", RoomType.ROOM_LIBRARY },
-    { "rt_sacrifice", RoomType.ROOM_SACRIFICE }, { "rt_isaacs", RoomType.ROOM_ISAACS },
-    { "rt_barren", RoomType.ROOM_BARREN }, { "rt_chest", RoomType.ROOM_CHEST },
-    { "rt_dice", RoomType.ROOM_DICE }, { "rt_planetarium", RoomType.ROOM_PLANETARIUM },
-}
-
-local function roomTypeName(rtype)
-    for _, r in ipairs(ROOM_TYPES) do
-        if r[2] == rtype then return t(r[1]) end
-    end
-    return t("rt_other", rtype)
-end
-
-local function teleport(index)
-    AC.menu.setOpen(false)
-    AC.game:StartRoomTransition(index, Direction.NO_DIRECTION, RoomTransitionAnim.TELEPORT)
-end
-
-local function findRoom(rtype)
-    local rooms = AC.game:GetLevel():GetRooms()
-    for i = 0, rooms.Size - 1 do
-        local desc = rooms:Get(i)
-        if desc.Data and desc.Data.Type == rtype then return desc.SafeGridIndex end
-    end
-    return nil
-end
-
--- { display name, stage number, stage-type suffix for the `stage` console command }
-local STAGES = {
-    { "Basement I", 1, "" }, { "Basement II", 2, "" }, { "Cellar I", 1, "a" }, { "Cellar II", 2, "a" },
-    { "Burning Basement I", 1, "b" }, { "Burning Basement II", 2, "b" },
-    { "Downpour I", 1, "c" }, { "Downpour II", 2, "c" }, { "Dross I", 1, "d" }, { "Dross II", 2, "d" },
-    { "Caves I", 3, "" }, { "Caves II", 4, "" }, { "Catacombs I", 3, "a" }, { "Catacombs II", 4, "a" },
-    { "Flooded Caves I", 3, "b" }, { "Flooded Caves II", 4, "b" },
-    { "Mines I", 3, "c" }, { "Mines II", 4, "c" }, { "Ashpit I", 3, "d" }, { "Ashpit II", 4, "d" },
-    { "Depths I", 5, "" }, { "Depths II", 6, "" }, { "Necropolis I", 5, "a" }, { "Necropolis II", 6, "a" },
-    { "Dank Depths I", 5, "b" }, { "Dank Depths II", 6, "b" },
-    { "Mausoleum I", 5, "c" }, { "Mausoleum II", 6, "c" }, { "Gehenna I", 5, "d" }, { "Gehenna II", 6, "d" },
-    { "Womb I", 7, "" }, { "Womb II", 8, "" }, { "Utero I", 7, "a" }, { "Utero II", 8, "a" },
-    { "Scarred Womb I", 7, "b" }, { "Scarred Womb II", 8, "b" },
-    { "Corpse I", 7, "c" }, { "Corpse II", 8, "c" },
-    { "Blue Womb", 9, "" }, { "Sheol", 10, "" }, { "Cathedral", 10, "a" },
-    { "Dark Room", 11, "" }, { "The Chest", 11, "a" }, { "The Void", 12, "" }, { "Home", 13, "" },
-}
-
-local CURSES = {
-    { "curse_darkness", LevelCurse.CURSE_OF_DARKNESS }, { "curse_labyrinth", LevelCurse.CURSE_OF_LABYRINTH },
-    { "curse_lost", LevelCurse.CURSE_OF_THE_LOST }, { "curse_unknown", LevelCurse.CURSE_OF_THE_UNKNOWN },
-    { "curse_cursed", LevelCurse.CURSE_OF_THE_CURSED }, { "curse_maze", LevelCurse.CURSE_OF_MAZE },
-    { "curse_blind", LevelCurse.CURSE_OF_BLIND }, { "curse_giant", LevelCurse.CURSE_OF_GIANT },
-}
+local state = { command = "", layout = "" }
 
 local function openDoors()
     local room = AC.game:GetRoom()

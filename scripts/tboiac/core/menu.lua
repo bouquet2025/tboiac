@@ -122,7 +122,7 @@ local function change(item, dir)
     else
         return
     end
-    AC.save.write()
+    AC.save.markDirty()
     menu.refresh()
 end
 
@@ -133,6 +133,7 @@ local function safe(fn, ...)
         AC.util.log("menu error: " .. tostring(err))
         AC.render.toast(t("error", tostring(err)), 180)
     end
+    AC.save.markDirty()
 end
 
 local function activate(item)

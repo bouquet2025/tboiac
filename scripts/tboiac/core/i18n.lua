@@ -18,4 +18,10 @@ function i18n.t(key, ...)
     return s
 end
 
+-- Like t(), but returns `s` unchanged when it is not a translation key (plain names).
+function i18n.label(s)
+    local lang = AC.save and AC.save.data.ui.lang or "en"
+    return (i18n.langs[lang] or {})[s] or i18n.langs.en[s] or s
+end
+
 return i18n

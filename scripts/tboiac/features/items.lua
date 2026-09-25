@@ -65,15 +65,7 @@ local function useItem(id)
     for _, p in ipairs(util.targets()) do p:UseActiveItem(id, UseFlag.USE_NOANIM) end
 end
 
-local cardNames = function(id)
-    local cfg = Isaac.GetItemConfig():GetCard(id)
-    return cfg and util.prettyName(cfg.Name) or nil
-end
-
-local pillNames = function(id)
-    local cfg = Isaac.GetItemConfig():GetPillEffect(id)
-    return cfg and util.prettyName(cfg.Name) or nil
-end
+local cardNames, pillNames = util.cardName, util.pillName
 
 feature.pages = {
     items = {
