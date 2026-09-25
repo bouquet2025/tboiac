@@ -12,7 +12,8 @@ local C = Controller or {}
 local PAD = {
     up = C.DPAD_UP or 2, down = C.DPAD_DOWN or 3, left = C.DPAD_LEFT or 0, right = C.DPAD_RIGHT or 1,
     confirm = C.BUTTON_A or 4, back = C.BUTTON_B or 5, y = C.BUTTON_Y or 7,
-    select = C.BUTTON_BACK or 14, fast = C.BUMPER_RIGHT or 11,
+    select = C.BUTTON_BACK or 14, x = C.BUTTON_X or 6,
+    lb = C.BUMPER_LEFT or 8, rb = C.BUMPER_RIGHT or 11, fast = C.TRIGGER_RIGHT or 12,
 }
 
 local KEYS = {
@@ -101,14 +102,23 @@ local function repeating(action)
 end
 
 -- Navigation events for this render frame.
+--   alt    = Shift+Enter or controller X (second action, e.g. "put on the floor")
+--   tabNext/tabPrev = Tab / Shift+Tab or controller RB / LB
 function input.poll()
+    local confirm = repeating("confirm") and input.held.confirm == 1
+    local tab = keyTriggered(Keyboard.KEY_TAB)
+    local padX, padLB, padRB = padTriggered(PAD.x), padTriggered(PAD.lb), padTriggered(PAD.rb)
+    local shift = input.shift()
     return {
         up = repeating("up"),
         down = repeating("down"),
         left = repeating("left"),
         right = repeating("right"),
-        confirm = repeating("confirm") and input.held.confirm == 1,
+        confirm = confirm and not shift,
+        alt = (confirm and shift) or padX,
         back = repeating("back") and input.held.back == 1,
+        tabNext = (tab and not shift) or padRB,
+        tabPrev = (tab and shift) or padLB,
     }
 end
 
@@ -122,6 +132,15 @@ TEXT_KEYS[Keyboard.KEY_MINUS] = "-"
 TEXT_KEYS[Keyboard.KEY_APOSTROPHE] = "'"
 
 -- Start text entry. `target` = { text = "...", onChange = fn(text), onDone = fn(text) }.
+-- Characters typed this frame (grid pages filter as you type, no text field needed).
+function input.typed()
+    local s = ""
+    for key, ch in pairs(TEXT_KEYS) do
+        if keyTriggered(key) then s = s .. ch end
+    end
+    return s
+end
+
 local END_KEYS = { Keyboard.KEY_ENTER, Keyboard.KEY_KP_ENTER, Keyboard.KEY_ESCAPE, Keyboard.KEY_BACKSPACE }
 
 function input.beginText(target)

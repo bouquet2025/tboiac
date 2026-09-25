@@ -370,4 +370,7 @@ function feature.reset()
     if S().clean then setClean(false) end
 end
 
+feature.setClean = setClean
+AC.studio = feature
+
 return feature

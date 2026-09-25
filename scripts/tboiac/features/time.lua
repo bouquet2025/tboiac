@@ -29,20 +29,26 @@ local function worldStopped()
     return AC.menu.open and AC.save.data.ui.pauseWorld
 end
 
+-- Hits clear the game's freeze flag and the AI keeps animating, so everything is re-applied every
+-- frame: the flag, the position, and the animation frame captured when the freeze started.
 local function freezeNpc(npc)
     local data = npc:GetData()
+    local sprite = npc:GetSprite()
     if not data.tboiacFreezePos then
         data.tboiacFreezePos = npc.Position
-        npc:AddEntityFlags(EntityFlag.FLAG_FREEZE)
+        data.tboiacFreezeAnim = { sprite:GetAnimation(), sprite:GetFrame() }
     end
+    if not npc:HasEntityFlags(EntityFlag.FLAG_FREEZE) then npc:AddEntityFlags(EntityFlag.FLAG_FREEZE) end
     npc.Position = data.tboiacFreezePos
     npc.Velocity = Vector.Zero
+    local anim = data.tboiacFreezeAnim
+    if anim[1] and anim[1] ~= "" then sprite:SetFrame(anim[1], anim[2]) end
 end
 
 local function unfreezeNpc(npc)
     local data = npc:GetData()
     if data.tboiacFreezePos then
-        data.tboiacFreezePos = nil
+        data.tboiacFreezePos, data.tboiacFreezeAnim = nil, nil
         npc:ClearEntityFlags(EntityFlag.FLAG_FREEZE)
     end
 end
@@ -113,6 +119,11 @@ feature.pages = {
 
 feature.callbacks = {
     { ModCallbacks.MC_POST_UPDATE, onUpdate },
+    -- Skip the AI of frozen enemies entirely (no walking, attacking or animating in place).
+    { ModCallbacks.MC_PRE_NPC_UPDATE, function(_, npc)
+        if npc:GetData().tboiacFreezePos then return true end
+        return nil
+    end },
     { ModCallbacks.MC_POST_NEW_ROOM, function() watchApplied = false end },
 }
 

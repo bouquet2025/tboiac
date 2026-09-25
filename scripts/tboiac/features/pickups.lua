@@ -60,10 +60,33 @@ local function removePickups(filter)
 end
 
 feature.pages = {
+    pickups_grid = AC.grid.page({
+        title = function() return t("m_pickups") end,
+        pickHint = "grid_spawn", altHint = "grid_five",
+        entries = function()
+            local out = {}
+            for _, g in ipairs(GROUPS) do
+                for _, p in ipairs(g[2]) do
+                    local key = "5." .. p[2] .. "." .. p[3]
+                    local name = t(p[1])
+                    out[#out + 1] = { name = name,
+                        icon = function(pos) return AC.icons.entityKey(key, 5, p[2], pos + Vector(0, 8), 1) end,
+                        pick = function(five)
+                            local n = state.count
+                            if five then state.count = 5 end
+                            spawn(p[2], p[3], name)
+                            state.count = n
+                        end }
+                end
+            end
+            return out
+        end,
+        extra = function() return { countItem() } end,
+    }),
     pickups = {
         title = function() return t("m_pickups") end,
         build = function()
-            local items = { countItem() }
+            local items = { menu.link(t("m_pickups_grid"), "pickups_grid"), countItem() }
             for _, g in ipairs(GROUPS) do
                 items[#items + 1] = menu.link(t(g[1]), "pickups_" .. g[1])
             end

@@ -95,6 +95,25 @@ function util.trinketName(id)
     return cfg and (AC.names.localize("Items", cfg.Name) or util.prettyName(cfg.Name)) or nil
 end
 
+-- Pickup text of an item ("Tears up"), when the game gives a readable one.
+local function readableDesc(category, text)
+    if not text or text == "" then return nil end
+    local loc = AC.names.localize(category, text)
+    if loc then return loc end
+    if text:sub(1, 1) == "#" then return nil end
+    return text
+end
+
+function util.collectibleDesc(id)
+    local cfg = Isaac.GetItemConfig():GetCollectible(id)
+    return cfg and readableDesc("Items", cfg.Description) or nil
+end
+
+function util.trinketDesc(id)
+    local cfg = Isaac.GetItemConfig():GetTrinket(id)
+    return cfg and readableDesc("Items", cfg.Description) or nil
+end
+
 -- English-ish name from the config key, used as a second search term.
 function util.collectibleAlias(id)
     local cfg = Isaac.GetItemConfig():GetCollectible(id)

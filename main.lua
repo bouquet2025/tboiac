@@ -5,7 +5,7 @@ local mod = RegisterMod("TBOIAC", 1)
 
 TBOIAC = {
     mod = mod,
-    version = "0.7.0",
+    version = "0.8.0",
     game = Game(),
     hasRepentogon = REPENTOGON ~= nil,
 }
@@ -24,6 +24,7 @@ AC.input = load("core.input")
 AC.render = load("core.render")
 AC.menu = load("core.menu")
 AC.catalog = load("core.catalog")
+AC.grid = load("core.grid")
 AC.icons = load("core.icons")
 AC.registry = load("core.registry")
 AC.imgui = load("core.imgui")
@@ -39,6 +40,7 @@ AC.ruleEditor = load("rules.editor")
 AC.registry.register(AC.ruleEditor)
 
 local features = {
+    "quick",
     "player",
     "items",
     "pools",
@@ -54,6 +56,16 @@ local features = {
 for _, name in ipairs(features) do
     AC.registry.register(load("features." .. name))
 end
+
+AC.registry.register({ id = "icons", callbacks = AC.icons.callbacks })
+
+-- Tabs across the top of the menu (the root list stays for the ImGui window).
+AC.menu.tabs = {
+    { label = "tab_quick", page = "quick" }, { label = "tab_player", page = "player" },
+    { label = "tab_items", page = "items" }, { label = "tab_enemies", page = "enemies" },
+    { label = "tab_world", page = "world" }, { label = "tab_rules", page = "rules" },
+    { label = "tab_studio", page = "studio" }, { label = "tab_settings", page = "settings" },
+}
 
 AC.registry.start()
 AC.util.log("loaded v" .. AC.version .. (AC.hasRepentogon and " (REPENTOGON)" or ""))

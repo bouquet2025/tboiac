@@ -3,7 +3,7 @@
     <name>TBOIAC - Isaac Admin Console</name>
     <directory>tboiac</directory>
     <description>Sandbox menu for content creators: full control over items, pickups, player, enemies, bosses, time, rooms and floors. Open with F2 (keyboard) or Select+Y (controller).</description>
-    <version>0.7.0</version>
+    <version>0.8.0</version>
     <visibility>Private</visibility>
     <tag id="Tweaks"/>
     <tag id="Lua"/>
