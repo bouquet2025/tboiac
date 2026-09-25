@@ -75,6 +75,7 @@ local function picker(title, onPick)
         title = function() return t(title) end,
         ids = function() return AC.catalog.range(1, util.maxCollectible()) end,
         name = util.collectibleName,
+        icon = AC.icons.collectible,
         pick = function(id)
             onPick(id)
             menu.pop()

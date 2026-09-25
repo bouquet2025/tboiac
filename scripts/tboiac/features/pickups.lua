@@ -68,6 +68,7 @@ feature.pages = {
                 items[#items + 1] = menu.link(t(g[1]), "pickups_" .. g[1])
             end
             items[#items + 1] = menu.link(t("pk_custom"), "pickups_custom")
+            items[#items + 1] = menu.link(t("m_drops"), "drops")
             items[#items + 1] = menu.action(t("pk_clear"), function()
                 removePickups(function(e) return e.Variant ~= PickupVariant.PICKUP_COLLECTIBLE end)
             end)

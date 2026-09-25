@@ -105,6 +105,10 @@ presets.list = {
         rule("prr_boss_banner", "room_enter", { roomType = RoomType.ROOM_BOSS, visit = "first" },
             { act("big_text", { text = "prt_boss", seconds = 3, color = "red" }) }),
     } },
+    { name = "pr_arena", rules = {
+        rule("prr_n_arena", "key_press", { key = Keyboard.KEY_N }, { act("waves_start") }),
+        rule("prr_wave_heal", "wave_clear", nil, { act("hearts", { kind = "soul", amount = 1 }) }),
+    } },
     { name = "pr_counter_demo", rules = {
         rule("prr_count_kills", "entity_killed", nil, { act("counter", { name = "kills", op = "add", value = 1 }) },
             { filter = { mode = "enemy", t = 10, v = -1, s = -1 } }),

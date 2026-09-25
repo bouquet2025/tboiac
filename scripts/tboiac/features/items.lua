@@ -106,6 +106,7 @@ feature.pages = {
         title = function() return t("m_collectibles") end,
         ids = function() return catalog.range(1, util.maxCollectible()) end,
         name = util.collectibleName,
+        icon = AC.icons.collectible,
         pick = giveCollectible,
         extra = function() return { modeChoice() } end,
     }),
@@ -116,7 +117,9 @@ feature.pages = {
             for _, id in ipairs(AC.save.data.recent.items) do
                 local name = util.collectibleName(id)
                 if name then
-                    items[#items + 1] = menu.action(name .. "  #" .. id, function() giveCollectible(id, name) end)
+                    local it = menu.action(name .. "  #" .. id, function() giveCollectible(id, name) end)
+                    it.preview = function(pos) AC.icons.collectible(id, pos) end
+                    items[#items + 1] = it
                 end
             end
             return items
@@ -142,6 +145,7 @@ feature.pages = {
         title = function() return t("m_trinkets") end,
         ids = function() return catalog.range(1, util.maxTrinket()) end,
         name = util.trinketName,
+        icon = AC.icons.trinket,
         pick = giveTrinket,
         extra = function() return { modeChoice() } end,
     }),
@@ -149,6 +153,7 @@ feature.pages = {
         title = function() return t("m_smelt") end,
         ids = function() return catalog.range(1, util.maxTrinket()) end,
         name = util.trinketName,
+        icon = AC.icons.trinket,
         pick = smeltTrinket,
     }),
     items_cards = catalog.page({

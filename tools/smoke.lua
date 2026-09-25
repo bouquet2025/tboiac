@@ -96,7 +96,7 @@ local callbackNames = { "MC_POST_RENDER", "MC_INPUT_ACTION", "MC_POST_GAME_START
     "MC_ENTITY_TAKE_DMG", "MC_EVALUATE_CACHE", "MC_POST_PEFFECT_UPDATE", "MC_POST_UPDATE",
     "MC_POST_NEW_ROOM", "MC_NPC_UPDATE", "MC_POST_CURSE_EVAL", "MC_POST_NEW_LEVEL", "MC_POST_NPC_DEATH",
     "MC_POST_PICKUP_UPDATE", "MC_USE_ITEM", "MC_USE_CARD", "MC_USE_PILL", "MC_POST_FIRE_TEAR",
-    "MC_POST_GET_COLLECTIBLE" }
+    "MC_POST_GET_COLLECTIBLE", "MC_PRE_SPAWN_CLEAN_AWARD", "MC_POST_PICKUP_INIT" }
 local cbEnum = {}
 for i, n in ipairs(callbackNames) do cbEnum[n] = i end
 ModCallbacks = enum("ModCallbacks", cbEnum)
@@ -178,6 +178,8 @@ local level = obj({ GetRooms = function() return rooms end, GetCurses = function
 local door = strictObj({}, { "Open", "Close", "Bar", "SetLocked", "TryBlowOpen" })
 local room = obj({ GetGridSize = function() return 3 end, GetDoor = function(_, slot) return slot == 0 and door or nil end,
     GetClampedPosition = function(_, p) return p end,
+    GetFrameCount = function() return 10 end,
+    SpawnClearAward = function() clearAwards = (clearAwards or 0) + 1 end,
     GetType = function() return 5 end, IsFirstVisit = function() return true end, IsClear = function() return false end,
     GetRandomPosition = function() return vec(10, 10) end, GetCenterPos = function() return vec(20, 20) end,
     GetGridEntity = function() return nil end, FindFreeTilePosition = function() return vec(0, 0) end,
@@ -205,6 +207,7 @@ local itemConfig = obj({
 
 -- Input simulation: set of pressed keys for this frame.
 local pressed = {}
+clearAwards = 0
 Input = {
     IsButtonPressed = function(k) return pressed[k] == true end,
     IsButtonTriggered = function(k) return pressed[k] == true end,
@@ -518,6 +521,60 @@ do
     pools.qmin, pools.qmax = 3, 4
     if get(1) ~= nil then fail("pools: impossible filter should keep the item") end
     pools.qmin, pools.qmax = 0, 4
+end
+
+-- Phase 3: arena waves.
+do
+    local waves
+    for _, f in ipairs(AC.registry.features) do if f.id == "waves" then waves = f end end
+    local E = AC.rules
+    E.setCounter("ws", 0)
+    E.setCounter("wc", 0)
+    local r1 = E.newRule("wave_start"); r1.acts = { { id = "counter", p = { name = "ws", op = "add", value = 1 } } }
+    local r2 = E.newRule("wave_clear"); r2.acts = { { id = "counter", p = { name = "wc", op = "add", value = 1 } } }
+    local r3 = E.newRule("waves_done"); r3.acts = { { id = "counter", p = { name = "wd", op = "add", value = 1 } } }
+    local ws = AC.save.data.waves
+    ws.total, ws.pause, ws.mode, ws.endless = 4, 1, "clear", true
+    fire("MC_POST_UPDATE") -- new frame: earlier checks may have used up this frame's fire budget
+    waves.start()
+    if waves.state.wave ~= 1 or waves.state.state ~= "fighting" then fail("waves: did not start") end
+    local realEntities = Isaac.GetRoomEntities
+    Isaac.GetRoomEntities = function() return {} end -- every wave is instantly cleared
+    for _ = 1, 400 do fire("MC_POST_UPDATE") end
+    fire("MC_POST_RENDER")
+    Isaac.GetRoomEntities = realEntities
+    if waves.state.state ~= "idle" then fail("waves: did not finish, state " .. waves.state.state) end
+    if waves.state.wave ~= 4 then fail("waves: expected 4 waves, got " .. waves.state.wave) end
+    if E.counter("ws") ~= 4 or E.counter("wc") ~= 4 or E.counter("wd") ~= 1 then
+        fail(string.format("waves: rule events %d/%d/%d", E.counter("ws"), E.counter("wc"), E.counter("wd")))
+    end
+    ws.mode, ws.interval = "timer", 5
+    waves.start()
+    for _ = 1, 400 do fire("MC_POST_UPDATE") end -- timer spawns next waves while enemies live
+    if waves.state.wave < 2 then fail("waves: timer mode did not advance") end
+    waves.stop(false)
+end
+
+-- Phase 3: reward rules.
+do
+    local drops
+    for _, f in ipairs(AC.registry.features) do if f.id == "drops" then drops = f end end
+    local ds = AC.save.data.drops
+    ds.enabled, ds.clearMult, ds.clearBonus, ds.bossItems = true, 3, "chest", 2
+    clearAwards = 0
+    if drops.onClearAward(AC.mod, Any, vec(0, 0)) ~= nil then fail("drops: award cancelled unexpectedly") end
+    if clearAwards ~= 2 then fail("drops: expected 2 extra awards, got " .. tostring(clearAwards)) end
+    ds.noClearAward = true
+    if drops.onClearAward(AC.mod, Any, vec(0, 0)) ~= true then fail("drops: award not cancelled") end
+    local removed = false
+    local coinData = {}
+    local coin = obj({ Variant = 20, SubType = 1, Price = 0, Position = vec(0, 0),
+        GetData = function() return coinData end, Remove = function() removed = true end })
+    ds.noPickups = true
+    fire("MC_POST_PICKUP_INIT", coin)
+    fire("MC_POST_PICKUP_UPDATE", coin)
+    if not removed then fail("drops: pickup not removed") end
+    AC.save.data.drops = AC.util.copy(AC.save.defaults.drops)
 end
 
 -- Phase 2c: movement behaviours move entities; screen text formats counters.

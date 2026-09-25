@@ -21,6 +21,7 @@ local function catalogPicker(spec, p)
         title = function() return t(spec.label) end,
         ids = function() return AC.catalog.range(cat.ids()) end,
         name = cat.name,
+        icon = cat.icon,
         pick = function(id)
             p[spec.key] = id
             menu.pop()
@@ -35,11 +36,13 @@ local function entityPicker(spec, p)
             build = function()
                 local items = {}
                 for _, e in ipairs(entries) do
-                    items[#items + 1] = menu.action(string.format("%s  %d.%d", e[1], e[2], e[3]), function()
+                    local it = menu.action(string.format("%s  %d.%d", e[1], e[2], e[3]), function()
                         p[spec.key] = e[2] .. "." .. e[3] .. ".0"
                         menu.pop()
                         menu.pop()
                     end)
+                    it.preview = function(pos) AC.icons.entity(e[2], e[3], pos) end
+                    items[#items + 1] = it
                 end
                 return items
             end,
@@ -386,6 +389,9 @@ local function onCache(_, player, flag)
 end
 
 feature.callbacks = { { ModCallbacks.MC_EVALUATE_CACHE, onCache } }
+
+-- Shared with other menus: page picking a boss/enemy into p[spec.key] as "type.variant.0".
+feature.entityPicker = entityPicker
 for _, cb in ipairs(AC.ruleEvents.callbacks) do table.insert(feature.callbacks, cb) end
 for _, cb in ipairs(AC.ruleEffects.callbacks) do table.insert(feature.callbacks, cb) end
 

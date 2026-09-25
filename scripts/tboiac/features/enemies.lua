@@ -61,6 +61,7 @@ feature.pages = {
         build = function()
             return withOptions({
                 menu.link(t("m_bosses"), "enemies_bosses"),
+                menu.link(t("m_enemies_common"), "enemies_common"),
                 menu.link(t("m_spawn_custom"), "enemies_custom"),
                 menu.link(t("m_recent"), "enemies_recent"),
                 menu.number(t("hp_mult"), "enemies", "hpMult", 0.1, 20, 0.1),
@@ -82,9 +83,25 @@ feature.pages = {
         build = function()
             local items = spawnOptions()
             for _, b in ipairs(BOSSES) do
-                items[#items + 1] = menu.action(string.format("%s  %d.%d", b[1], b[2], b[3]), function()
+                local it = menu.action(string.format("%s  %d.%d", b[1], b[2], b[3]), function()
                     spawn(b[2], b[3], 0, b[1])
                 end)
+                it.preview = function(pos) AC.icons.entity(b[2], b[3], pos) end
+                items[#items + 1] = it
+            end
+            return items
+        end,
+    },
+    enemies_common = {
+        title = function() return t("m_enemies_common") end,
+        build = function()
+            local items = spawnOptions()
+            for _, b in ipairs(AC.data.ENEMIES) do
+                local it = menu.action(string.format("%s  %d.%d", b[1], b[2], b[3]), function()
+                    spawn(b[2], b[3], 0, b[1])
+                end)
+                it.preview = function(pos) AC.icons.entity(b[2], b[3], pos) end
+                items[#items + 1] = it
             end
             return items
         end,

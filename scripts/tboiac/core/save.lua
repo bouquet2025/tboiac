@@ -22,6 +22,21 @@ save.defaults = {
     rules = { enabled = true, list = {}, nextId = 1 },
     -- Item pool filters: black/white are id lists, replace is a list of { from, to }.
     pools = { enabled = false, black = {}, white = {}, replace = {}, qmin = 0, qmax = 4 },
+    -- Arena waves: list entries are { kind = "enemy"|"boss"|"entity", ent = "t.v.s", count, champion }.
+    waves = {
+        list = {
+            { kind = "enemy", ent = "10.0.0", count = 4, champion = false },
+            { kind = "enemy", ent = "10.0.0", count = 6, champion = false },
+            { kind = "boss", ent = "20.0.0", count = 1, champion = false },
+        },
+        mode = "clear", interval = 20, pause = 3, total = 10, endless = true, growth = 1, bossEvery = 5,
+        reward = "pickup", lockDoors = true,
+    },
+    -- Reward rules: room clear award multiplier/bonus, pickup multiplier, enemy drops.
+    drops = {
+        enabled = false, clearMult = 1, clearBonus = "none", noClearAward = false, bossItems = 0,
+        pickupMult = 1, noPickups = false, enemyDrop = 0,
+    },
     -- Per-run rule state; wiped when a new run starts (kept on continue).
     run = {
         flags = {}, counters = {}, fired = {}, matches = {},

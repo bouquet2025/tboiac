@@ -107,9 +107,11 @@ end
 -- Searchable catalogs shared by the item menus and rule editor.
 util.catalogs = {
     collectible = { name = function(id) return util.collectibleName(id) end,
-                    ids = function() return 1, util.maxCollectible() end },
+                    ids = function() return 1, util.maxCollectible() end,
+                    icon = function(id, pos) AC.icons.collectible(id, pos) end },
     trinket = { name = function(id) return util.trinketName(id) end,
-                ids = function() return 1, util.maxTrinket() end },
+                ids = function() return 1, util.maxTrinket() end,
+                icon = function(id, pos) AC.icons.trinket(id, pos) end },
     card = { name = function(id) return util.cardName(id) end,
              ids = function() return 1, Isaac.GetItemConfig():GetCards().Size - 1 end },
     pill = { name = function(id) return util.pillName(id) end,

@@ -7,6 +7,7 @@
 --   { kind = "page",   label, page = id | pageTable }
 --   { kind = "text",   label, get, set, live }  -- keyboard text entry
 --   { kind = "info",   label }                  -- not selectable
+-- Any item may carry `preview = fn(screenPos)` to draw an icon while it is selected.
 -- Labels may be strings or functions returning strings.
 local AC = TBOIAC
 local t = function(...) return AC.i18n.t(...) end
@@ -252,6 +253,11 @@ function menu.draw()
         local v, vcolor = valueText(item, sel)
         if v then
             AC.render.text(v, x + width - 12 - AC.render.textWidth(v), y, vcolor or color)
+        end
+        if sel and item.preview then
+            -- Icon of the selected entry, drawn to the right of the menu box.
+            local ok, err = pcall(item.preview, Vector(x + width + 24, y + lh))
+            if not ok then AC.util.log("preview error: " .. tostring(err)) item.preview = nil end
         end
         y = y + lh
     end

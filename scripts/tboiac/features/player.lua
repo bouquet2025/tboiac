@@ -127,6 +127,7 @@ feature.pages = {
         title = function() return t("m_costumes") end,
         ids = function() return AC.catalog.range(1, util.maxCollectible()) end,
         name = util.collectibleName,
+        icon = AC.icons.collectible,
         pick = function(id)
             local cfg = Isaac.GetItemConfig():GetCollectible(id)
             if cfg then for _, p in ipairs(util.targets()) do p:AddCostume(cfg, false) end end

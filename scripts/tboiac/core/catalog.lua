@@ -1,5 +1,6 @@
 -- Searchable list pages: collectibles, trinkets, cards, pills, entities.
--- catalog.page{ title, ids = fn() -> {id...}, name = fn(id) -> string?, pick = fn(id), extra = fn() -> items }
+-- catalog.page{ title, ids = fn() -> {id...}, name = fn(id) -> string?, pick = fn(id), extra = fn() -> items,
+--               icon = fn(id, screenPos) optional preview of the selected entry }
 local AC = TBOIAC
 local t = function(...) return AC.i18n.t(...) end
 
@@ -45,6 +46,7 @@ function catalog.page(def)
                         kind = "action",
                         label = string.format("%s  #%s", e.name, tostring(e.id)),
                         fn = function() def.pick(e.id, e.name) end,
+                        preview = def.icon and function(pos) def.icon(e.id, pos) end or nil,
                     }
                 end
             end
