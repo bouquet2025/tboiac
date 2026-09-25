@@ -21,6 +21,7 @@ local function catalogPicker(spec, p)
         title = function() return t(spec.label) end,
         ids = function() return AC.catalog.range(cat.ids()) end,
         name = cat.name,
+        alias = cat.alias,
         icon = cat.icon,
         pick = function(id)
             p[spec.key] = id
@@ -36,7 +37,7 @@ local function entityPicker(spec, p)
             build = function()
                 local items = {}
                 for _, e in ipairs(entries) do
-                    local it = menu.action(string.format("%s  %d.%d", e[1], e[2], e[3]), function()
+                    local it = menu.action(string.format("%s  %d.%d", util.entityName(e[2], e[3], e[1]), e[2], e[3]), function()
                         p[spec.key] = e[2] .. "." .. e[3] .. ".0"
                         menu.pop()
                         menu.pop()

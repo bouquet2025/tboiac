@@ -286,4 +286,8 @@ return {
     factory_done = "Все настройки сброшены", ev_manual = "Только вручную (сценарий)",
     a_run_rule = "Запустить другое правило", a_toggle_option = "Переключить опцию", option = "Опция",
     opt_inf_all = "Бесконечные монеты/бомбы/ключи", a_stopwatch = "Секундомер",
+    -- фаза 5: REPENTOGON
+    imgui_open = "Меню", back = "Назад", home = "Главная", refresh = "Обновить",
+    rgon_found = "REPENTOGON найден", rgon_missing = "REPENTOGON не установлен: опции ниже не действуют",
+    imgui_menu = "ImGui-меню (панель консоли ~)", game_names = "Названия из игры (на её языке)",
 }

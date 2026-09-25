@@ -80,7 +80,7 @@ end
 function input.toggleMenuPressed()
     local key = keyTriggered(AC.save.data.keys.open)
     local pad = padTriggered(PAD.y) and padPressed(PAD.select)
-    if input.textTarget then return false end
+    if input.textTarget or AC.imgui.active() then return false end
     return key or pad
 end
 

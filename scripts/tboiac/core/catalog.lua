@@ -1,6 +1,7 @@
 -- Searchable list pages: collectibles, trinkets, cards, pills, entities.
 -- catalog.page{ title, ids = fn() -> {id...}, name = fn(id) -> string?, pick = fn(id), extra = fn() -> items,
---               icon = fn(id, screenPos) optional preview of the selected entry }
+--               icon = fn(id, screenPos) optional preview of the selected entry,
+--               alias = fn(id) optional second name matched by search (e.g. English) }
 local AC = TBOIAC
 local t = function(...) return AC.i18n.t(...) end
 
@@ -16,7 +17,12 @@ function catalog.page(def)
             cache = {}
             for _, id in ipairs(def.ids()) do
                 local name = def.name(id)
-                if name then cache[#cache + 1] = { id = id, name = name, lower = name:lower() } end
+                if name then
+                    local alias = def.alias and def.alias(id)
+                    local lower = AC.names.lower(name)
+                    if alias and alias ~= name then lower = lower .. "\n" .. AC.names.lower(alias) end
+                    cache[#cache + 1] = { id = id, name = name, lower = lower }
+                end
             end
         end
         return cache
@@ -32,7 +38,7 @@ function catalog.page(def)
                 },
             }
             for _, it in ipairs(def.extra and def.extra() or {}) do items[#items + 1] = it end
-            local q = state.query:lower()
+            local q = AC.names.lower(state.query)
             local qid = tonumber(q)
             local found = 0
             for _, e in ipairs(entries()) do

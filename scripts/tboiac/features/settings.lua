@@ -29,6 +29,9 @@ feature.pages = {
                 menu.number(t("ui_x"), "ui", "x", 0, 400, 5),
                 menu.number(t("ui_y"), "ui", "y", 0, 300, 5),
                 menu.toggle(t("pause_world_menu"), "ui", "pauseWorld"),
+                menu.info(AC.hasRepentogon and t("rgon_found") or t("rgon_missing")),
+                menu.toggle(t("imgui_menu"), "ui", "imgui"),
+                menu.toggle(t("game_names"), "ui", "gameNames"),
                 menu.info(t("pad_hint")),
                 menu.action(t("reset_settings"), function()
                     AC.save.data.ui = util.copy(AC.save.defaults.ui)

@@ -279,4 +279,8 @@ return {
     factory_done = "All settings reset", ev_manual = "Manual only (scenario)", a_run_rule = "Run another rule",
     a_toggle_option = "Switch an option", option = "Option", opt_inf_all = "Infinite coins/bombs/keys",
     a_stopwatch = "Stopwatch",
+    -- phase 5: REPENTOGON
+    imgui_open = "Menu", back = "Back", home = "Home", refresh = "Refresh",
+    rgon_found = "REPENTOGON found", rgon_missing = "REPENTOGON not installed: options below do nothing",
+    imgui_menu = "ImGui menu (~ console bar)", game_names = "Names from the game (its language)",
 }

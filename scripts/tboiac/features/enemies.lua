@@ -83,8 +83,9 @@ feature.pages = {
         build = function()
             local items = spawnOptions()
             for _, b in ipairs(BOSSES) do
-                local it = menu.action(string.format("%s  %d.%d", b[1], b[2], b[3]), function()
-                    spawn(b[2], b[3], 0, b[1])
+                local name = util.entityName(b[2], b[3], b[1])
+                local it = menu.action(string.format("%s  %d.%d", name, b[2], b[3]), function()
+                    spawn(b[2], b[3], 0, name)
                 end)
                 it.preview = function(pos) AC.icons.entity(b[2], b[3], pos) end
                 items[#items + 1] = it
@@ -97,8 +98,9 @@ feature.pages = {
         build = function()
             local items = spawnOptions()
             for _, b in ipairs(AC.data.ENEMIES) do
-                local it = menu.action(string.format("%s  %d.%d", b[1], b[2], b[3]), function()
-                    spawn(b[2], b[3], 0, b[1])
+                local name = util.entityName(b[2], b[3], b[1])
+                local it = menu.action(string.format("%s  %d.%d", name, b[2], b[3]), function()
+                    spawn(b[2], b[3], 0, name)
                 end)
                 it.preview = function(pos) AC.icons.entity(b[2], b[3], pos) end
                 items[#items + 1] = it

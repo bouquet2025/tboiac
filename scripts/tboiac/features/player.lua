@@ -144,9 +144,10 @@ feature.pages = {
         build = function()
             local items = {}
             for _, c in ipairs(CHARACTERS) do
-                items[#items + 1] = menu.action(c[2], each(function(p)
+                local name = util.characterName(c[1], c[2])
+                items[#items + 1] = menu.action(name, each(function(p)
                     p:ChangePlayerType(c[1])
-                    AC.render.toast(t("changed_to", c[2]))
+                    AC.render.toast(t("changed_to", name))
                 end))
             end
             return items

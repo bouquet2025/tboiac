@@ -5,7 +5,7 @@ local mod = RegisterMod("TBOIAC", 1)
 
 TBOIAC = {
     mod = mod,
-    version = "0.6.0",
+    version = "0.7.0",
     game = Game(),
     hasRepentogon = REPENTOGON ~= nil,
 }
@@ -18,6 +18,7 @@ end
 AC.util = load("core.util")
 AC.data = load("data.game")
 AC.i18n = load("core.i18n")
+AC.names = load("core.names")
 AC.save = load("core.save")
 AC.input = load("core.input")
 AC.render = load("core.render")
@@ -25,6 +26,7 @@ AC.menu = load("core.menu")
 AC.catalog = load("core.catalog")
 AC.icons = load("core.icons")
 AC.registry = load("core.registry")
+AC.imgui = load("core.imgui")
 
 AC.ruleParams = load("rules.params")
 AC.rules = load("rules.engine")

@@ -51,6 +51,7 @@ function registry.start()
         AC.menu.draw()
         AC.render.drawToasts()
         AC.save.flush()
+        AC.imgui.update()
     end)
     mod:AddCallback(ModCallbacks.MC_INPUT_ACTION, AC.input.onInputAction)
     mod:AddCallback(ModCallbacks.MC_POST_GAME_STARTED, function() AC.save.load() end)
@@ -80,6 +81,7 @@ function registry.start()
     for _, f in ipairs(registry.features) do
         if f.init then f.init() end
     end
+    AC.imgui.init()
 end
 
 return registry

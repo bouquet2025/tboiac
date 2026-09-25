@@ -100,7 +100,7 @@ local function onUpdate()
 end
 
 local function onRender()
-    if AC.menu.open or AC.input.textTarget then return end
+    if AC.menu.open or AC.input.textTarget or AC.imgui.active() then return end
     local S = engine.S()
     if not S.enabled then return end
     local seen = {}

@@ -84,32 +84,54 @@ function util.prettyName(name)
     return (name:gsub("(%a)([%w']*)", function(a, b) return a:upper() .. b end))
 end
 
+-- Names prefer the game's localized strings (REPENTOGON), then a readable form of the key.
 function util.collectibleName(id)
     local cfg = Isaac.GetItemConfig():GetCollectible(id)
-    return cfg and util.prettyName(cfg.Name) or nil
+    return cfg and (AC.names.localize("Items", cfg.Name) or util.prettyName(cfg.Name)) or nil
 end
 
 function util.trinketName(id)
     local cfg = Isaac.GetItemConfig():GetTrinket(id)
+    return cfg and (AC.names.localize("Items", cfg.Name) or util.prettyName(cfg.Name)) or nil
+end
+
+-- English-ish name from the config key, used as a second search term.
+function util.collectibleAlias(id)
+    local cfg = Isaac.GetItemConfig():GetCollectible(id)
     return cfg and util.prettyName(cfg.Name) or nil
+end
+
+function util.trinketAlias(id)
+    local cfg = Isaac.GetItemConfig():GetTrinket(id)
+    return cfg and util.prettyName(cfg.Name) or nil
+end
+
+function util.entityName(etype, variant, fallback)
+    return AC.names.entity(etype, variant) or fallback
+end
+
+function util.characterName(ptype, fallback)
+    return AC.names.character(ptype) or fallback
 end
 
 function util.cardName(id)
     local cfg = Isaac.GetItemConfig():GetCard(id)
-    return cfg and util.prettyName(cfg.Name) or nil
+    return cfg and (AC.names.localize("PocketItems", cfg.Name) or util.prettyName(cfg.Name)) or nil
 end
 
 function util.pillName(id)
     local cfg = Isaac.GetItemConfig():GetPillEffect(id)
-    return cfg and util.prettyName(cfg.Name) or nil
+    return cfg and (AC.names.localize("PocketItems", cfg.Name) or util.prettyName(cfg.Name)) or nil
 end
 
 -- Searchable catalogs shared by the item menus and rule editor.
 util.catalogs = {
     collectible = { name = function(id) return util.collectibleName(id) end,
+                    alias = function(id) return util.collectibleAlias(id) end,
                     ids = function() return 1, util.maxCollectible() end,
                     icon = function(id, pos) AC.icons.collectible(id, pos) end },
     trinket = { name = function(id) return util.trinketName(id) end,
+                alias = function(id) return util.trinketAlias(id) end,
                 ids = function() return 1, util.maxTrinket() end,
                 icon = function(id, pos) AC.icons.trinket(id, pos) end },
     card = { name = function(id) return util.cardName(id) end,

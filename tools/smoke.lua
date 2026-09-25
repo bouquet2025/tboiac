@@ -523,6 +523,120 @@ do
     pools.qmin, pools.qmax = 0, 4
 end
 
+-- Phase 5: REPENTOGON - localized names and the ImGui mirror, against a simulated REPENTOGON.
+do
+    local elements, order = {}, {}
+    local function reg(id, e)
+        if id ~= "" then
+            if elements[id] then fail("imgui: duplicate element id " .. id) end
+            elements[id] = e
+            order[#order + 1] = id
+        end
+    end
+    local stub = {
+        CreateMenu = function(id, label) reg(id, { kind = "menu", label = label }) end,
+        CreateWindow = function(id, label) reg(id, { kind = "window", label = label }) end,
+        AddElement = function(parent, id, etype, label) reg(id, { kind = "element", label = label, parent = parent }) end,
+        LinkWindowToElement = function() end, SetWindowSize = function() end, SetVisible = function() end,
+        IsVisible = function() return false end, PushNotification = function(text) fail("imgui notification: " .. text) end,
+        ElementExists = function(id) return elements[id] ~= nil end,
+        RemoveElement = function(id)
+            if not elements[id] then fail("imgui: removing missing element " .. tostring(id)) end
+            elements[id] = nil
+        end,
+        UpdateText = function(id, text) if elements[id] then elements[id].label = text end end,
+        AddText = function(parent, text, wrap, id) reg(id or "", { kind = "text", label = text, parent = parent }) end,
+        AddButton = function(parent, id, label, cb) reg(id, { kind = "button", label = label, cb = cb, parent = parent }) end,
+        AddCheckbox = function(parent, id, label, cb, v) reg(id, { kind = "checkbox", label = label, cb = cb, value = v }) end,
+        AddDragFloat = function(parent, id, label, cb, v) reg(id, { kind = "drag", label = label, cb = cb, value = v }) end,
+        AddDragInteger = function(parent, id, label, cb, v) reg(id, { kind = "drag", label = label, cb = cb, value = v }) end,
+        AddCombobox = function(parent, id, label, cb, opts, sel)
+            reg(id, { kind = "combo", label = label, cb = cb, options = opts, value = sel })
+        end,
+        AddInputText = function(parent, id, label, cb, v) reg(id, { kind = "input", label = label, cb = cb, value = v }) end,
+    }
+    stub.RemoveMenu, stub.RemoveWindow = stub.RemoveElement, stub.RemoveElement
+    rawset(_G, "ImGui", stub)
+    rawset(_G, "ImGuiElement", { MenuItem = 2, Separator = 6, SameLine = 11 })
+    rawset(_G, "ImGuiNotificationType", { INFO = 0, SUCCESS = 1, WARNING = 2, ERROR = 3 })
+    rawset(_G, "EntityConfig", {
+        GetEntity = function(t, v) return obj({ GetName = function() return t == 20 and "#MONSTRO" or "" end }) end,
+        GetPlayer = function() return obj({ GetName = function() return "#ISAAC_NAME" end }) end,
+    })
+    local STR = { ["Items:ITEM_1_NAME"] = "Грустный лук", ["Entities:MONSTRO"] = "Монстро",
+                  ["Players:ISAAC_NAME"] = "Айзек" }
+    Isaac.GetString = function(cat, key) return STR[cat .. ":" .. key] or key end
+    AC.hasRepentogon = true
+    AC.save.data.ui.imgui, AC.save.data.ui.gameNames = true, true
+
+    if AC.util.collectibleName(1) ~= "Грустный лук" then fail("names: item " .. tostring(AC.util.collectibleName(1))) end
+    if AC.util.entityName(20, 0, "x") ~= "Монстро" then fail("names: entity") end
+    if AC.util.entityName(99, 0, "Fallback") ~= "Fallback" then fail("names: entity fallback") end
+    if AC.util.characterName(0, "x") ~= "Айзек" then fail("names: character") end
+    if AC.names.lower("ГРУСТНЫЙ Ёж Abc") ~= "грустный ёж abc" then fail("names: utf8 lower " .. AC.names.lower("ГРУСТНЫЙ Ёж Abc")) end
+
+    AC.imgui.shutdown()
+    AC.imgui.init()
+    fire("MC_POST_RENDER")
+    local function current()
+        local list = {}
+        for _, id in ipairs(order) do
+            local e = elements[id]
+            if e and e.parent == "tboiacWindow" then list[#list + 1] = e end
+        end
+        return list
+    end
+    if #current() < 5 then fail("imgui: root page not built") end
+    local back = "< " .. AC.i18n.t("back")
+    local visited, clicks = 0, 0
+    local function explore(depth)
+        visited = visited + 1
+        if depth > 3 or visited > 250 then return end
+        -- exercise value widgets on this page
+        for _, e in ipairs(current()) do
+            if e.kind == "checkbox" then e.cb(not e.value); fire("MC_POST_RENDER"); break end
+        end
+        for _, e in ipairs(current()) do
+            if e.kind == "input" then e.cb("тест"); fire("MC_POST_RENDER"); e.cb(""); fire("MC_POST_RENDER"); break end
+        end
+        for _, e in ipairs(current()) do
+            if e.kind == "combo" and e.options[1] then e.cb(0, e.options[1]); fire("MC_POST_RENDER"); break end
+        end
+        for _, e in ipairs(current()) do
+            if e.kind == "drag" then e.cb(e.value); fire("MC_POST_RENDER"); break end
+        end
+        -- navigate into sub pages (buttons ending with ">")
+        local links = {}
+        for _, e in ipairs(current()) do
+            if e.kind == "button" and e.label:sub(-1) == ">" and not e.label:find("!!") then links[#links + 1] = e.label end
+        end
+        for _, label in ipairs(links) do
+            for _, e in ipairs(current()) do
+                if e.kind == "button" and e.label == label then
+                    clicks = clicks + 1
+                    e.cb()
+                    fire("MC_POST_RENDER")
+                    explore(depth + 1)
+                    for _, b in ipairs(current()) do
+                        if b.kind == "button" and b.label == back then b.cb() fire("MC_POST_RENDER") break end
+                    end
+                    break
+                end
+            end
+        end
+    end
+    if os.getenv("SMOKE_IMGUI") then
+        for _, e in ipairs(current()) do print("root", e.kind, e.label) end
+    end
+    explore(0)
+    print("imgui: visited " .. visited .. " pages via " .. clicks .. " clicks")
+    if clicks < 20 then fail("imgui: navigation did not work") end
+    AC.imgui.shutdown()
+    if elements.tboiacWindow or elements.tboiacMenu then fail("imgui: shutdown left the window") end
+    AC.hasRepentogon = false
+    Isaac.GetString = nil
+end
+
 -- Phase 4: studio.
 do
     local studio

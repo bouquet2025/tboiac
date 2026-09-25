@@ -6,7 +6,8 @@ local util = AC.util
 local save = {}
 
 save.defaults = {
-    ui = { lang = "ru", scale = 1, alpha = 0.8, x = 40, y = 30, pauseWorld = false },
+    ui = { lang = "ru", scale = 1, alpha = 0.8, x = 40, y = 30, pauseWorld = false,
+           imgui = true, gameNames = true }, -- the last two only matter with REPENTOGON
     keys = { open = Keyboard.KEY_F2 },
     player = {
         target = 0,
