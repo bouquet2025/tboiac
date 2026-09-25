@@ -6,8 +6,9 @@ local util = AC.util
 local save = {}
 
 save.defaults = {
-    ui = { lang = "ru", scale = 1, alpha = 0.8, x = 40, y = 30, pauseWorld = false,
-           imgui = true, gameNames = true }, -- the last two only matter with REPENTOGON
+    ui = { lang = "ru", scale = 1, alpha = 0.8, x = 16, y = 14, pauseWorld = false,
+           imgui = true, gameNames = true, -- these two only matter with REPENTOGON
+           layout = 2 }, -- bumped when the menu layout changes; older saves get the new position
     keys = { open = Keyboard.KEY_F2 },
     player = {
         target = 0,
@@ -46,6 +47,8 @@ save.defaults = {
         },
     },
     profiles = {},
+    -- Learned anm2 paths of entities seen in play: "type.variant" / "5.variant.subtype" -> path.
+    iconCache = {},
     -- Reward rules: room clear award multiplier/bonus, pickup multiplier, enemy drops.
     drops = {
         enabled = false, clearMult = 1, clearBonus = "none", noClearAward = false, bossItems = 0,
@@ -65,7 +68,12 @@ function save.load()
     if not mod:HasData() then return end
     local ok, data = pcall(json.decode, mod:LoadData())
     if ok and type(data) == "table" then
+        local layout = type(data.ui) == "table" and data.ui.layout
         save.data = util.merge(data, save.defaults)
+        if layout ~= save.defaults.ui.layout then
+            save.data.ui.x, save.data.ui.y = save.defaults.ui.x, save.defaults.ui.y
+            save.data.ui.layout = save.defaults.ui.layout
+        end
     else
         util.log("save data is corrupt, using defaults")
     end

@@ -29,6 +29,7 @@ feature.pages = {
         build = function()
             return {
                 menu.link(t("m_teleport"), "world_teleport"),
+                menu.link(t("m_time"), "time"),
                 menu.link(t("m_rooms"), "world_rooms"),
                 menu.link(t("m_stages"), "world_stages"),
                 menu.link(t("m_room_tools"), "world_room"),

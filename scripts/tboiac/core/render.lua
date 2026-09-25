@@ -58,6 +58,22 @@ function render.text(s, x, y, color, scale)
     end
 end
 
+-- Split text into lines that fit `width` (words are kept whole).
+function render.wrap(s, width, scale)
+    local lines, line = {}, ""
+    for word in s:gmatch("%S+") do
+        local try = line == "" and word or (line .. " " .. word)
+        if line ~= "" and render.textWidth(try, scale) > width then
+            lines[#lines + 1] = line
+            line = word
+        else
+            line = try
+        end
+    end
+    if line ~= "" then lines[#lines + 1] = line end
+    return lines
+end
+
 function render.rect(x, y, w, h, color)
     local s = getBox()
     s.Scale = Vector(w, h)

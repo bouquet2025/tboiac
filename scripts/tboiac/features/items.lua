@@ -21,8 +21,10 @@ local function spawnPickup(variant, subtype)
     Isaac.Spawn(EntityType.ENTITY_PICKUP, variant, subtype, util.spawnPos(), Vector.Zero, nil)
 end
 
-local function giveCollectible(id, name)
-    if mode.give == "pedestal" then
+-- `floor` true/false overrides the "give as" setting (grid: Enter = inventory, Shift+Enter = floor).
+local function giveCollectible(id, name, floor)
+    if floor == nil then floor = mode.give == "pedestal" end
+    if floor then
         spawnPickup(PickupVariant.PICKUP_COLLECTIBLE, id)
     else
         for _, p in ipairs(util.targets()) do p:AddCollectible(id, 0, true) end
@@ -31,8 +33,9 @@ local function giveCollectible(id, name)
     AC.render.toast(t("given", name or util.collectibleName(id) or id))
 end
 
-local function giveTrinket(id, name)
-    if mode.give == "pedestal" then
+local function giveTrinket(id, name, floor)
+    if floor == nil then floor = mode.give == "pedestal" end
+    if floor then
         spawnPickup(PickupVariant.PICKUP_TRINKET, id)
     else
         for _, p in ipairs(util.targets()) do p:AddTrinket(id, true) end
@@ -72,14 +75,14 @@ feature.pages = {
         title = function() return t("m_items") end,
         build = function()
             return {
-                modeChoice(),
-                menu.link(t("m_collectibles"), "items_collectibles"),
-                menu.link(t("m_recent"), "items_recent"),
-                menu.link(t("m_inventory"), "items_inventory"),
-                menu.link(t("m_trinkets"), "items_trinkets"),
-                menu.link(t("m_smelt"), "items_smelt"),
+                menu.link(t("m_collectibles"), "items_grid"),
+                menu.link(t("m_trinkets"), "trinkets_grid"),
+                menu.link(t("m_pickups"), "pickups"),
                 menu.link(t("m_cards"), "items_cards"),
                 menu.link(t("m_pills"), "items_pills"),
+                menu.link(t("m_recent"), "items_recent"),
+                menu.link(t("m_inventory"), "items_inventory"),
+                menu.link(t("m_smelt"), "items_smelt"),
                 menu.link(t("m_pools"), "pools"),
                 menu.action(t("reroll_pedestals"), function() useItem(CollectibleType.COLLECTIBLE_D6) end),
                 menu.action(t("reroll_inventory"), function() useItem(CollectibleType.COLLECTIBLE_D4) end),
@@ -102,14 +105,22 @@ feature.pages = {
             }
         end,
     },
-    items_collectibles = catalog.page({
+    items_grid = AC.grid.page({
         title = function() return t("m_collectibles") end,
-        ids = function() return catalog.range(1, util.maxCollectible()) end,
-        name = util.collectibleName,
-        alias = util.collectibleAlias,
-        icon = AC.icons.collectible,
-        pick = giveCollectible,
-        extra = function() return { modeChoice() } end,
+        pickHint = "grid_give", altHint = "grid_floor",
+        entries = function()
+            local list = {}
+            for id = 1, util.maxCollectible() do
+                local name = util.collectibleName(id)
+                if name then
+                    list[#list + 1] = { id = id, name = name, alias = util.collectibleAlias(id),
+                        desc = function() return util.collectibleDesc(id) end,
+                        icon = function(pos) return AC.icons.collectible(id, pos) end,
+                        pick = function(floor) giveCollectible(id, name, floor) end }
+                end
+            end
+            return list
+        end,
     }),
     items_recent = {
         title = function() return t("m_recent") end,
@@ -142,14 +153,22 @@ feature.pages = {
             return items
         end,
     },
-    items_trinkets = catalog.page({
+    trinkets_grid = AC.grid.page({
         title = function() return t("m_trinkets") end,
-        ids = function() return catalog.range(1, util.maxTrinket()) end,
-        name = util.trinketName,
-        alias = util.trinketAlias,
-        icon = AC.icons.trinket,
-        pick = giveTrinket,
-        extra = function() return { modeChoice() } end,
+        pickHint = "grid_give", altHint = "grid_floor",
+        entries = function()
+            local list = {}
+            for id = 1, util.maxTrinket() do
+                local name = util.trinketName(id)
+                if name then
+                    list[#list + 1] = { id = id, name = name, alias = util.trinketAlias(id),
+                        desc = function() return util.trinketDesc(id) end,
+                        icon = function(pos) return AC.icons.trinket(id, pos) end,
+                        pick = function(floor) giveTrinket(id, name, floor) end }
+                end
+            end
+            return list
+        end,
     }),
     items_smelt = catalog.page({
         title = function() return t("m_smelt") end,

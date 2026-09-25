@@ -12,7 +12,9 @@ local BOSSES = AC.data.BOSSES
 local state = { type = 10, variant = 0, subtype = 0, count = 1, champion = false }
 
 
-local function spawn(etype, variant, subtype, label)
+-- `friendly` true/false overrides the "spawn as friendly" setting (grid: Shift+Enter).
+local function spawn(etype, variant, subtype, label, friendly)
+    if friendly == nil then friendly = S().friendlySpawn end
     local player = util.firstTarget()
     for i = 1, state.count do
         local angle = (i / state.count) * 360
@@ -21,7 +23,7 @@ local function spawn(etype, variant, subtype, label)
         local npc = e and e:ToNPC()
         if npc then
             if state.champion and not npc:IsBoss() then npc:MakeChampion(Random(), -1, true) end
-            if S().friendlySpawn then
+            if friendly then
                 npc:AddCharmed(EntityRef(player), -1)
                 npc:AddEntityFlags(EntityFlag.FLAG_PERSISTENT)
             end
@@ -55,13 +57,35 @@ local function withOptions(list)
     return items
 end
 
+local function entityGrid(titleKey, list, scale)
+    return AC.grid.page({
+        title = function() return t(titleKey) end,
+        pickHint = "grid_spawn", altHint = "grid_friendly",
+        entries = function()
+            local out = {}
+            for _, b in ipairs(list) do
+                local key = b[2] .. "." .. b[3]
+                local name = util.entityName(b[2], b[3], b[1])
+                out[#out + 1] = { name = name, id = key,
+                    icon = function(pos) return AC.icons.entityKey(key, b[2], b[3], pos + Vector(0, 11), scale) end,
+                    pick = function(friendly) spawn(b[2], b[3], 0, name, friendly) end }
+            end
+            return out
+        end,
+        extra = spawnOptions,
+    })
+end
+
 feature.pages = {
+    boss_grid = entityGrid("m_bosses", AC.data.BOSSES, 0.5),
+    enemy_grid = entityGrid("m_enemies_common", AC.data.ENEMIES, 0.75),
     enemies = {
         title = function() return t("m_enemies") end,
         build = function()
             return withOptions({
-                menu.link(t("m_bosses"), "enemies_bosses"),
-                menu.link(t("m_enemies_common"), "enemies_common"),
+                menu.link(t("m_bosses"), "boss_grid"),
+                menu.link(t("m_enemies_common"), "enemy_grid"),
+                menu.link(t("m_waves"), "waves"),
                 menu.link(t("m_spawn_custom"), "enemies_custom"),
                 menu.link(t("m_recent"), "enemies_recent"),
                 menu.number(t("hp_mult"), "enemies", "hpMult", 0.1, 20, 0.1),

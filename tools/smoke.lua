@@ -82,6 +82,7 @@ local keyboard = { KEY_SPACE = 32, KEY_APOSTROPHE = 39, KEY_MINUS = 45, KEY_PERI
     KEY_LEFT_SHIFT = 340, KEY_RIGHT_SHIFT = 344 }
 for i = 1, 12 do keyboard["KEY_F" .. i] = 289 + i end
 for c = 65, 90 do keyboard["KEY_" .. string.char(c)] = c end
+keyboard.KEY_TAB = 258
 for d = 0, 9 do keyboard["KEY_" .. d] = 48 + d; keyboard["KEY_KP_" .. d] = 320 + d end
 Keyboard = enum("Keyboard", keyboard)
 Controller = enum("Controller", { DPAD_LEFT = 0, DPAD_RIGHT = 1, DPAD_UP = 2, DPAD_DOWN = 3,
@@ -96,7 +97,7 @@ local callbackNames = { "MC_POST_RENDER", "MC_INPUT_ACTION", "MC_POST_GAME_START
     "MC_ENTITY_TAKE_DMG", "MC_EVALUATE_CACHE", "MC_POST_PEFFECT_UPDATE", "MC_POST_UPDATE",
     "MC_POST_NEW_ROOM", "MC_NPC_UPDATE", "MC_POST_CURSE_EVAL", "MC_POST_NEW_LEVEL", "MC_POST_NPC_DEATH",
     "MC_POST_PICKUP_UPDATE", "MC_USE_ITEM", "MC_USE_CARD", "MC_USE_PILL", "MC_POST_FIRE_TEAR",
-    "MC_POST_GET_COLLECTIBLE", "MC_PRE_SPAWN_CLEAN_AWARD", "MC_POST_PICKUP_INIT" }
+    "MC_POST_GET_COLLECTIBLE", "MC_PRE_SPAWN_CLEAN_AWARD", "MC_POST_PICKUP_INIT", "MC_PRE_NPC_UPDATE" }
 local cbEnum = {}
 for i, n in ipairs(callbackNames) do cbEnum[n] = i end
 ModCallbacks = enum("ModCallbacks", cbEnum)
@@ -332,7 +333,7 @@ for _, lang in ipairs({ "ru", "en" }) do
     local visited, pages = {}, 0
     -- Re-open the menu along `path` (page ids or page tables) so every press starts from a known state.
     local function ensure(path)
-        AC.menu.setOpen(true)
+        AC.menu.setOpen(true, path[1])
         for i = 2, #path do AC.menu.push(path[i]) end
         return AC.menu.stack[#AC.menu.stack]
     end
@@ -521,6 +522,80 @@ do
     pools.qmin, pools.qmax = 3, 4
     if get(1) ~= nil then fail("pools: impossible filter should keep the item") end
     pools.qmin, pools.qmax = 0, 4
+end
+
+-- Freeze: flag restored after a hit clears it, AI skipped while frozen.
+do
+    local flags, flagsAdded = false, 0
+    local frozenData = {}
+    local victim = obj({ Position = vec(5, 5), Velocity = vec(1, 1), GetData = function() return frozenData end,
+        ToNPC = function(self) return self end, ToProjectile = function() return nil end,
+        HasEntityFlags = function(_, f) return f == EntityFlag.FLAG_FREEZE and flags end,
+        AddEntityFlags = function() flags = true flagsAdded = flagsAdded + 1 end,
+        ClearEntityFlags = function() flags = false end,
+        GetSprite = function() return obj({ GetAnimation = function() return "Walk" end, GetFrame = function() return 3 end }) end })
+    local real = Isaac.GetRoomEntities
+    Isaac.GetRoomEntities = function() return { victim } end
+    AC.save.data.time.freezeEnemies = true
+    fire("MC_POST_UPDATE")
+    flags = false -- a tear hit clears the game's freeze flag
+    fire("MC_POST_UPDATE")
+    if flagsAdded < 2 then fail("freeze: flag not re-applied after it was cleared") end
+    local skipped
+    for _, cb in ipairs(callbacks) do
+        if cb.id == ModCallbacks.MC_PRE_NPC_UPDATE then skipped = cb.fn(AC.mod, victim) end
+    end
+    if skipped ~= true then fail("freeze: AI of a frozen enemy is not skipped") end
+    AC.save.data.time.freezeEnemies = false
+    fire("MC_POST_UPDATE")
+    if flags or frozenData.tboiacFreezePos then fail("freeze: not released") end
+    Isaac.GetRoomEntities = real
+end
+
+-- v0.8: tabs and icon grids.
+do
+    local M = AC.menu
+    AC.menu.setOpen(false)
+    frame({ Keyboard.KEY_F2 }); frame()
+    if M.stack[1].page.id ~= "quick" then fail("menu should open on the Quick tab") end
+    frame({ Keyboard.KEY_TAB }); frame()
+    if M.tab ~= 2 or M.stack[1].page.id ~= M.tabs[2].page then fail("Tab did not switch tabs") end
+    frame({ Keyboard.KEY_LEFT_SHIFT, Keyboard.KEY_TAB }); frame()
+    if M.tab ~= 1 then fail("Shift+Tab did not go back") end
+    for _, tab in ipairs(M.tabs) do
+        if not M.pages[tab.page] then fail("tab page missing: " .. tab.page) end
+    end
+    AC.menu.setOpen(false)
+    for _, id in ipairs({ "items_grid", "trinkets_grid", "boss_grid", "enemy_grid", "pickups_grid" }) do
+        local page = M.pages[id]
+        if not page or not page.grid then fail("grid page missing: " .. id) else
+            AC.menu.setOpen(true, id)
+            local f = M.stack[#M.stack]
+            if #f.entries == 0 then fail(id .. ": no entries") end
+            local picked = 0
+            for _, e in ipairs(f.entries) do
+                local orig = e.pick
+                e.pick = function(alt) picked = picked + 1 orig(alt) end
+            end
+            frame({ Keyboard.KEY_RIGHT }); frame()
+            frame({ Keyboard.KEY_DOWN }); frame()
+            frame({ Keyboard.KEY_ENTER }); frame()
+            frame({ Keyboard.KEY_LEFT_SHIFT, Keyboard.KEY_ENTER }); frame()
+            if picked ~= 2 then fail(id .. ": Enter/Shift+Enter picked " .. picked .. " times") end
+            frame({ Keyboard.KEY_Z }); frame()
+            if page.query ~= "z" then fail(id .. ": typing did not filter (" .. page.query .. ")") end
+            frame({ Keyboard.KEY_BACKSPACE }); frame()
+            if page.query ~= "" then fail(id .. ": backspace did not erase") end
+            frame({ Keyboard.KEY_BACKSPACE }); frame()
+            if AC.menu.open then fail(id .. ": backspace on empty search should go back/close") end
+            if #page.build() < 2 then fail(id .. ": list fallback empty") end
+            for _, e in ipairs(f.entries) do e.pick = nil end
+        end
+    end
+    -- descriptions resolve from labels
+    if not AC.i18n.desc(AC.i18n.t("god")) then fail("description lookup failed") end
+    if not AC.i18n.desc("  " .. AC.i18n.t("m_stats")) then fail("description lookup with indent failed") end
+    AC.menu.setOpen(false)
 end
 
 -- Phase 5: REPENTOGON - localized names and the ImGui mirror, against a simulated REPENTOGON.
