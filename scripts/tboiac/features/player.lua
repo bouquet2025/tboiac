@@ -63,6 +63,7 @@ feature.pages = {
                 menu.link(t("m_health"), "player_health"),
                 menu.link(t("m_resources"), "player_resources"),
                 menu.link(t("m_character"), "player_character"),
+                menu.link(t("m_costumes"), "player_costumes"),
                 menu.action(t("full_heal"), each(function(p) p:SetFullHearts() end)),
                 menu.action(t("revive"), each(function(p) if p:IsDead() then p:Revive() end end)),
                 menu.action(t("kill_player"), each(function(p) p:Kill() end)),
@@ -122,6 +123,21 @@ feature.pages = {
             }
         end,
     },
+    player_costumes = AC.catalog.page({
+        title = function() return t("m_costumes") end,
+        ids = function() return AC.catalog.range(1, util.maxCollectible()) end,
+        name = util.collectibleName,
+        pick = function(id)
+            local cfg = Isaac.GetItemConfig():GetCollectible(id)
+            if cfg then for _, p in ipairs(util.targets()) do p:AddCostume(cfg, false) end end
+        end,
+        extra = function()
+            return {
+                menu.info(t("costumes_hint")),
+                menu.action(t("a_clear_costumes"), each(function(p) p:ClearCostumes() end)),
+            }
+        end,
+    }),
     player_character = {
         title = function() return t("m_character") end,
         build = function()

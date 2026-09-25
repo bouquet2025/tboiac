@@ -40,18 +40,18 @@ function render.lineHeight()
     return (f and f:GetLineHeight() or 10) * AC.save.data.ui.scale + 2
 end
 
-function render.textWidth(s)
+function render.textWidth(s, scale)
     local f = getFont()
     if not f then return #s * 6 end
-    return f:GetStringWidthUTF8(s) * AC.save.data.ui.scale
+    return f:GetStringWidthUTF8(s) * AC.save.data.ui.scale * (scale or 1)
 end
 
--- color = { r, g, b, a } with components in 0..1
-function render.text(s, x, y, color)
+-- color = { r, g, b, a } with components in 0..1; `scale` multiplies the UI text scale.
+function render.text(s, x, y, color, scale)
     local f = getFont()
     color = color or { 1, 1, 1, 1 }
     if f then
-        local scale = AC.save.data.ui.scale
+        scale = AC.save.data.ui.scale * (scale or 1)
         f:DrawStringScaledUTF8(s, x, y, scale, scale, KColor(color[1], color[2], color[3], color[4]), 0, false)
     else
         Isaac.RenderText(s, x, y, color[1], color[2], color[3], color[4])

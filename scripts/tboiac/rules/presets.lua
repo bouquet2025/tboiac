@@ -89,6 +89,22 @@ presets.list = {
             { act("spawn_entity", { ent = "18.0.0", count = 8, pos = "player", formation = "circle",
                                     spacing = 40, friendly = true }) }),
     } },
+    { name = "pr_kill_overlay", rules = {
+        rule("prr_overlay_show", "room_enter", { roomType = -1, visit = "any" },
+            { act("screen_text", { text = "prt_kills", slot = "kills", x = 60, y = 40, scale = 1.5, color = "yellow" }) },
+            { conds = { cond("once_run") } }),
+        rule("prr_overlay_count", "entity_killed", nil, { act("counter", { name = "kills", op = "add", value = 1 }) },
+            { filter = { mode = "enemy", t = 10, v = -1, s = -1 } }),
+    } },
+    { name = "pr_dancing", rules = {
+        rule("prr_dance", "entity_spawned", nil,
+            { act("behaviour", { target = "trigger", kind = "patrol", shape = "eight", radius2 = 40, speed = 3 }) },
+            { filter = { mode = "enemy", t = 10, v = -1, s = -1 } }),
+    } },
+    { name = "pr_boss_intro", rules = {
+        rule("prr_boss_banner", "room_enter", { roomType = RoomType.ROOM_BOSS, visit = "first" },
+            { act("big_text", { text = "prt_boss", seconds = 3, color = "red" }) }),
+    } },
     { name = "pr_counter_demo", rules = {
         rule("prr_count_kills", "entity_killed", nil, { act("counter", { name = "kills", op = "add", value = 1 }) },
             { filter = { mode = "enemy", t = 10, v = -1, s = -1 } }),
@@ -105,6 +121,9 @@ function presets.apply(preset)
     for _, r in ipairs(preset.rules) do
         local copy = AC.rules.addRule(r)
         copy.name = AC.i18n.label(r.name)
+        for _, a in ipairs(copy.acts) do
+            if a.p and a.p.text then a.p.text = AC.i18n.label(a.p.text) end
+        end
     end
 end
 

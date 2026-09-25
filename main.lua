@@ -5,7 +5,7 @@ local mod = RegisterMod("TBOIAC", 1)
 
 TBOIAC = {
     mod = mod,
-    version = "0.3.0",
+    version = "0.4.0",
     game = Game(),
     hasRepentogon = REPENTOGON ~= nil,
 }
@@ -29,7 +29,8 @@ AC.ruleParams = load("rules.params")
 AC.rules = load("rules.engine")
 AC.ruleEvents = load("rules.events")
 load("rules.conditions")
-load("rules.actions")
+AC.ruleActions = load("rules.actions")
+AC.ruleEffects = load("rules.effects")
 AC.rulePresets = load("rules.presets")
 AC.registry.register(load("rules.editor"))
 

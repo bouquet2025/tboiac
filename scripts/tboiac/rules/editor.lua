@@ -387,11 +387,13 @@ end
 
 feature.callbacks = { { ModCallbacks.MC_EVALUATE_CACHE, onCache } }
 for _, cb in ipairs(AC.ruleEvents.callbacks) do table.insert(feature.callbacks, cb) end
+for _, cb in ipairs(AC.ruleEffects.callbacks) do table.insert(feature.callbacks, cb) end
 
 -- Panic button: stop all rules (they stay saved and can be re-enabled).
 function feature.reset()
     engine.S().enabled = false
     engine.queue = {}
+    AC.ruleEffects.reset()
 end
 
 return feature

@@ -44,7 +44,7 @@ local PLAYER_API = { "AddCollectible", "RemoveCollectible", "HasCollectible", "G
     "Die", "IsDead", "TakeDamage", "AddCacheFlags", "EvaluateItems", "GetActiveItem", "NeedsCharge",
     "FullCharge", "GetData", "ToPlayer", "ToNPC", "ToPickup", "ToProjectile", "Exists", "Remove",
     "AddVelocity", "GetName", "AddEntityFlags", "HasEntityFlags", "ClearEntityFlags", "GetSprite", "SetColor",
-    "GridCollisionClass" }
+    "GridCollisionClass", "AddCostume", "ClearCostumes" }
 
 -- Strict enum: unknown names are reported.
 local function enum(name, values)
@@ -56,7 +56,8 @@ end
 local function vec(x, y)
     return setmetatable({ X = x, Y = y,
         Distance = function(a, b) return math.sqrt((a.X - b.X) ^ 2 + (a.Y - b.Y) ^ 2) end,
-        Normalized = function(a) return vec(1, 0) end }, {
+        Normalized = function(a) return vec(1, 0) end,
+        GetAngleDegrees = function() return 0 end }, {
         __add = function(a, b) return vec(a.X + b.X, a.Y + b.Y) end,
         __sub = function(a, b) return vec(a.X - b.X, a.Y - b.Y) end,
         __mul = function(a, b)
@@ -130,6 +131,9 @@ DoorSlot = enum("DoorSlot", { NUM_DOOR_SLOTS = 8 })
 GridEntityType = enum("GridEntityType", { GRID_ROCK = 2, GRID_PIT = 7, GRID_SPIKES = 8, GRID_DOOR = 16,
     GRID_TRAPDOOR = 17, GRID_STAIRS = 18, GRID_WALL = 15 })
 EffectVariant = enum("EffectVariant", { HEAVEN_LIGHT_DOOR = 39 })
+SeedEffect = enum("SeedEffect", { SEED_BIG_HEAD = 32, SEED_KAPPA = 44, SEED_NO_HUD = 10 })
+Music = enum("Music", { MUSIC_NULL = 0, MUSIC_BASEMENT = 1, MUSIC_CAVES = 2, MUSIC_BOSS = 11 })
+MusicManager = function() return obj() end
 
 -- Game objects
 local playerData = {}
@@ -145,6 +149,7 @@ local player = strictObj({
     GetHearts = function() return 6 end, GetSoulHearts = function() return 2 end, GetBoneHearts = function() return 0 end,
     GetCollectibleCount = function() return 3 end, HasTrinket = function() return false end,
     QueuedItem = { Item = obj({ ID = 7, IsCollectible = function() return true end }) }, Type = 1,
+    Color = { R = 1, G = 1, B = 1, A = 1, RO = 0, GO = 0, BO = 0 }, SpriteRotation = 0, Velocity = vec(0, 0),
 }, PLAYER_API)
 local npcData = {}
 local npc = obj({
@@ -154,10 +159,12 @@ local npc = obj({
     IsVulnerableEnemy = function() return true end, IsDead = function() return false end,
     HasEntityFlags = function() return false end, IsBoss = function() return false end,
     IsChampion = function() return false end, Exists = function() return true end,
+    Color = { R = 1, G = 1, B = 1, A = 1, RO = 0, GO = 0, BO = 0 }, SpriteRotation = 0,
     GetSprite = function() return obj({ IsPlaying = function() return true end }) end,
     ToPickup = function() return nil end, Type = 10, Variant = 0, SubType = 0,
 })
 local pickup = obj({ Type = 5, Variant = 100, SubType = 3, Position = vec(0, 0), Velocity = vec(0, 0),
+    Color = { R = 1, G = 1, B = 1, A = 1, RO = 0, GO = 0, BO = 0 }, SpriteRotation = 0,
     GetData = function() return {} end, ToNPC = function() return nil end, Exists = function() return true end,
     ToPickup = function(self) return self end, ToPlayer = function() return nil end,
     GetSprite = function() return obj({ IsPlaying = function() return true end }) end })
@@ -168,7 +175,9 @@ local rooms = obj({ Size = 2, Get = function() return roomDesc end })
 local level = obj({ GetRooms = function() return rooms end, GetCurses = function() return 1 end,
     GetStage = function() return 3 end,
     GetStartingRoomIndex = function() return 84 end, GetCurrentRoomIndex = function() return 84 end })
-local room = obj({ GetGridSize = function() return 3 end, GetDoor = function() return nil end,
+local door = strictObj({}, { "Open", "Close", "Bar", "SetLocked", "TryBlowOpen" })
+local room = obj({ GetGridSize = function() return 3 end, GetDoor = function(_, slot) return slot == 0 and door or nil end,
+    GetClampedPosition = function(_, p) return p end,
     GetType = function() return 5 end, IsFirstVisit = function() return true end, IsClear = function() return false end,
     GetRandomPosition = function() return vec(10, 10) end, GetCenterPos = function() return vec(20, 20) end,
     GetGridEntity = function() return nil end, FindFreeTilePosition = function() return vec(0, 0) end,
@@ -213,10 +222,12 @@ Isaac = {
     RenderText = function() end,
     Spawn = function() return npc end, GridSpawn = function() end,
     GetRoomEntities = function() return { npc, proj } end,
-    FindByType = function() return { obj({ Variant = 10, Position = vec(0, 0) }) } end,
+    FindByType = function() return { obj({ Variant = 10, Position = vec(0, 0),
+        Color = { R = 1, G = 1, B = 1, A = 1, RO = 0, GO = 0, BO = 0 } }) } end,
     GetFreeNearPosition = function(p) return p end,
     ExecuteCommand = function() return "" end,
     Explode = function() end,
+    WorldToScreen = function(p) return p end,
 }
 Font = function() return obj({ IsLoaded = function() return true end, GetLineHeight = function() return 10 end,
     GetStringWidthUTF8 = function(_, s) return #s * 5 end }) end
@@ -333,6 +344,7 @@ for _, lang in ipairs({ "ru", "en" }) do
         if visited[id] or #path > 8 then return end
         visited[id] = true
         pages = pages + 1
+        if os.getenv("SMOKE_PAGES") then print("page", lang, id) end
         for i, item in ipairs(f.items) do
             if type(item.label) ~= "string" then fail(id .. ": label is not a string at " .. i) end
         end
@@ -506,6 +518,31 @@ do
     pools.qmin, pools.qmax = 3, 4
     if get(1) ~= nil then fail("pools: impossible filter should keep the item") end
     pools.qmin, pools.qmax = 0, 4
+end
+
+-- Phase 2c: movement behaviours move entities; screen text formats counters.
+do
+    local E = AC.rules
+    for _, kind in ipairs({ "orbit", "patrol", "attract", "immobile", "spin" }) do
+        npc.Position = vec(300, 300)
+        E.runAction({ id = "behaviour", p = { target = "trigger", kind = kind, speed = 5, radius2 = 50,
+            shape = "square", seconds = 0 } }, { entity = npc, player = player }, { id = 1 })
+        if not npcData.tboiacMove then fail("behaviour " .. kind .. " not applied") end
+        for _ = 1, 5 do fire("MC_POST_UPDATE") end
+        if kind == "orbit" and npc.Position.X == 300 and npc.Position.Y == 300 then fail("orbit did not move") end
+    end
+    E.runAction({ id = "behaviour_clear", p = { target = "trigger" } }, { entity = npc, player = player }, { id = 1 })
+    if npcData.tboiacMove then fail("behaviour not cleared") end
+    E.setCounter("kills", 7)
+    if AC.ruleEffects.format("k={kills} f={flag:x}") ~= "k=7 f=" .. AC.i18n.t("off") then
+        fail("screen text formatting: " .. AC.ruleEffects.format("k={kills} f={flag:x}"))
+    end
+    E.runAction({ id = "screen_text", p = E.defaults(E.actions.screen_text) }, { player = player }, { id = 1 })
+    E.runAction({ id = "big_text", p = E.defaults(E.actions.big_text) }, { player = player }, { id = 1 })
+    fire("MC_POST_RENDER")
+    if not AC.ruleEffects.texts.a then fail("screen text slot missing") end
+    E.runAction({ id = "clear_text", p = { slot = "" } }, { player = player }, { id = 1 })
+    if next(AC.ruleEffects.texts) then fail("clear_text did not clear") end
 end
 
 -- Formations and targets: a clone in circle formation, labels and lists round-trip.

@@ -481,4 +481,5 @@ def({ id = "pool_remove", label = "a_pool_remove", params = { P.catalog("id", "i
 def({ id = "command", label = "a_command", params = { P.text("cmd", "command", "") },
     run = function(p) if p.cmd ~= "" then util.command(p.cmd) end end })
 
-return true
+-- Helpers shared with rules/effects.lua.
+return { entityAction = entityAction, targets = targets, position = position, player = player }

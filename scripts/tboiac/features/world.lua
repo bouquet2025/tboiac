@@ -35,6 +35,11 @@ feature.pages = {
                 menu.link(t("m_curses"), "world_curses"),
                 menu.link(t("m_run"), "world_run"),
                 menu.link(t("m_console"), "world_console"),
+                menu.link(t("m_seeds"), "world_seeds"),
+                menu.link(t("m_music"), "world_music"),
+                { kind = "toggle", label = t("hide_hud"),
+                  get = function() return not AC.game:GetHUD():IsVisible() end,
+                  set = function(v) AC.game:GetHUD():SetVisible(not v) end },
                 menu.action(t("reveal_map"), function()
                     local level = AC.game:GetLevel()
                     level:ApplyMapEffect()
@@ -108,6 +113,10 @@ feature.pages = {
                     openDoors()
                 end),
                 menu.action(t("open_doors"), openDoors),
+                menu.action(t("door_close"), function() AC.ruleEffects.doors("close") end),
+                menu.action(t("door_bar"), function() AC.ruleEffects.doors("bar") end),
+                menu.action(t("door_lock"), function() AC.ruleEffects.doors("lock") end),
+                menu.action(t("door_blow"), function() AC.ruleEffects.doors("blow") end),
                 menu.action(t("spawn_trapdoor"), function() gridAtPlayer(GridEntityType.GRID_TRAPDOOR) end),
                 menu.action(t("spawn_crawlspace"), function() gridAtPlayer(GridEntityType.GRID_STAIRS) end),
                 menu.action(t("spawn_light"), function()
@@ -165,6 +174,37 @@ feature.pages = {
                 end),
                 menu.action(t("reseed_floor"), function() util.command("reseed") end),
             }
+        end,
+    },
+    world_seeds = {
+        title = function() return t("m_seeds") end,
+        build = function()
+            local seeds = AC.game:GetSeeds()
+            local items = { menu.info(t("seeds_hint")) }
+            for _, sd in ipairs(AC.ruleParams.seeds()) do
+                items[#items + 1] = { kind = "toggle", label = sd[1],
+                    get = function() return seeds:HasSeedEffect(sd[2]) end,
+                    set = function(v) if v then seeds:AddSeedEffect(sd[2]) else seeds:RemoveSeedEffect(sd[2]) end end }
+            end
+            items[#items + 1] = menu.action(t("a_clear_seeds"), function() seeds:ClearSeedEffects() end)
+            return items
+        end,
+    },
+    world_music = {
+        title = function() return t("m_music") end,
+        build = function()
+            local items = {
+                menu.action(t("music_fade"), function() MusicManager():Fadeout() end),
+                menu.action(t("music_off"), function() MusicManager():Disable() end),
+                menu.action(t("music_on"), function() MusicManager():Enable() end),
+            }
+            for _, track in ipairs(AC.ruleParams.music()) do
+                items[#items + 1] = menu.action(track[1], function()
+                    MusicManager():Enable()
+                    MusicManager():Play(track[2], 1)
+                end)
+            end
+            return items
         end,
     },
     world_console = {

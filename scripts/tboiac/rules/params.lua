@@ -121,6 +121,48 @@ function P.characters()
     return list
 end
 
+-- "SEED_BIG_HEAD" -> "Big Head"
+local function prettyEnum(name, prefix)
+    name = name:gsub("^" .. prefix, ""):gsub("_", " "):lower()
+    return (name:gsub("(%a)([%w]*)", function(a, b) return a:upper() .. b end))
+end
+
+-- Easter-egg seed effects useful for videos; names missing in this game version are skipped.
+local SEED_NAMES = {
+    "SEED_BIG_HEAD", "SEED_SMALL_HEAD", "SEED_NO_FACE", "SEED_BLACK_ISAAC", "SEED_INVISIBLE_ISAAC",
+    "SEED_INVISIBLE_ENEMIES", "SEED_CAMO_ISAAC", "SEED_CAMO_ENEMIES", "SEED_CAMO_PICKUPS",
+    "SEED_CAMO_EVERYTHING", "SEED_FART_SOUNDS", "SEED_OLD_TV", "SEED_DYSLEXIA", "SEED_NO_HUD",
+    "SEED_PICKUPS_SLIDE", "SEED_CONTROLS_REVERSED", "SEED_ALL_CHAMPIONS", "SEED_ALWAYS_CHARMED",
+    "SEED_ALWAYS_CONFUSED", "SEED_ALWAYS_AFRAID", "SEED_EXTRA_BLOOD", "SEED_POOP_TRAIL", "SEED_PACIFIST",
+    "SEED_DAMAGE_WHEN_STOPPED", "SEED_ENEMIES_RESPAWN", "SEED_ITEMS_COST_MONEY", "SEED_GLOWING_TEARS",
+    "SEED_SLOW_MUSIC", "SEED_FAST_MUSIC", "SEED_ICE_PHYSICS", "SEED_KAPPA", "SEED_CHRISTMAS", "SEED_KIDS_MODE",
+    "SEED_SHOOT_IN_MOVEMENT_DIRECTION", "SEED_SHOOT_OPPOSITE_MOVEMENT_DIRECTION", "SEED_SUPER_HOT",
+    "SEED_RETRO_VISION", "SEED_G_FUEL", "SEED_MOVEMENT_PITCH", "SEED_HEALTH_PITCH",
+    "SEED_ISAAC_TAKES_HIGH_DAMAGE", "SEED_PERMANENT_CURSE_DARKNESS",
+}
+
+function P.seeds()
+    local present = {}
+    for name, v in pairs(SeedEffect) do present[name] = v end
+    local list = {}
+    for _, name in ipairs(SEED_NAMES) do
+        if present[name] then list[#list + 1] = { prettyEnum(name, "SEED_"), present[name] } end
+    end
+    return list
+end
+
+-- All music tracks of this game version, sorted by id.
+function P.music()
+    local list = {}
+    for name, v in pairs(Music) do
+        if type(v) == "number" and name:match("^MUSIC_") and name ~= "MUSIC_NULL" then
+            list[#list + 1] = { prettyEnum(name, "MUSIC_"), v }
+        end
+    end
+    table.sort(list, function(a, b) return a[2] < b[2] end)
+    return list
+end
+
 -- Keys a rule can be bound to (letters, digits, F-keys, numpad).
 function P.keys()
     local list = {}
