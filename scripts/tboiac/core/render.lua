@@ -66,6 +66,7 @@ function render.rect(x, y, w, h, color)
 end
 
 function render.toast(msg, frames)
+    if AC.save.data.studio and AC.save.data.studio.clean then return end -- "clean frame" for recording
     table.insert(render.toasts, { msg = msg, t = frames or 90 })
     while #render.toasts > 5 do table.remove(render.toasts, 1) end
 end

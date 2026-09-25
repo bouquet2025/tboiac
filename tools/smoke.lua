@@ -523,6 +523,46 @@ do
     pools.qmin, pools.qmax = 0, 4
 end
 
+-- Phase 4: studio.
+do
+    local studio
+    for _, f in ipairs(AC.registry.features) do if f.id == "studio" then studio = f end end
+    local E = AC.rules
+    -- profile round trip, including a save/load through JSON
+    AC.save.data.player.god = true
+    studio.saveProfile(3, "test")
+    AC.save.write()
+    AC.save.load()
+    AC.save.data.player.god = false
+    local prof = studio.getProfile(3)
+    if not prof or prof.name ~= "test" then fail("profiles: slot 3 lost after save/load") end
+    studio.loadProfile(prof)
+    if AC.save.data.player.god ~= true then fail("profiles: load did not restore settings") end
+    AC.save.data.player.god = false
+    -- stopwatch counts updates only while running
+    studio.stopwatch.frames, studio.stopwatch.running = 0, true
+    for _ = 1, 30 do fire("MC_POST_UPDATE") end
+    studio.stopwatch.running = false
+    fire("MC_POST_UPDATE")
+    if studio.stopwatch.frames ~= 30 then fail("stopwatch: " .. studio.stopwatch.frames) end
+    -- clean frame suppresses toasts
+    AC.render.toasts = {}
+    AC.save.data.studio.clean = true
+    AC.render.toast("x")
+    if #AC.render.toasts ~= 0 then fail("clean frame did not hide toasts") end
+    AC.save.data.studio.clean = false
+    -- toggle_option and run_rule
+    E.runAction({ id = "toggle_option", p = { option = "god", mode = "on" } }, { player = player }, { id = 1 })
+    if AC.save.data.player.god ~= true then fail("toggle_option did not switch god mode") end
+    AC.save.data.player.god = false
+    AC.save.data.rules.enabled = true
+    local scen = E.newRule("manual")
+    scen.acts = { { id = "counter", p = { name = "scen", op = "add", value = 1 } } }
+    E.setCounter("scen", 0)
+    E.runAction({ id = "run_rule", p = { rule = scen.id } }, { player = player }, { id = 0 })
+    if E.counter("scen") ~= 1 then fail("run_rule did not run the scenario") end
+end
+
 -- Phase 3: arena waves.
 do
     local waves
@@ -535,6 +575,7 @@ do
     local r3 = E.newRule("waves_done"); r3.acts = { { id = "counter", p = { name = "wd", op = "add", value = 1 } } }
     local ws = AC.save.data.waves
     ws.total, ws.pause, ws.mode, ws.endless = 4, 1, "clear", true
+    AC.save.data.rules.enabled = true -- the toggle_option variants above may have switched rules off
     fire("MC_POST_UPDATE") -- new frame: earlier checks may have used up this frame's fire budget
     waves.start()
     if waves.state.wave ~= 1 or waves.state.state ~= "fighting" then fail("waves: did not start") end

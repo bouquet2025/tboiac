@@ -392,6 +392,8 @@ feature.callbacks = { { ModCallbacks.MC_EVALUATE_CACHE, onCache } }
 
 -- Shared with other menus: page picking a boss/enemy into p[spec.key] as "type.variant.0".
 feature.entityPicker = entityPicker
+-- Rule editor page for a rule (used by the Studio's scenarios and hotkeys pages).
+feature.rulePage = function(rule) return rulePage(rule) end
 for _, cb in ipairs(AC.ruleEvents.callbacks) do table.insert(feature.callbacks, cb) end
 for _, cb in ipairs(AC.ruleEffects.callbacks) do table.insert(feature.callbacks, cb) end
 

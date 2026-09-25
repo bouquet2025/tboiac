@@ -5,7 +5,7 @@ local mod = RegisterMod("TBOIAC", 1)
 
 TBOIAC = {
     mod = mod,
-    version = "0.5.0",
+    version = "0.6.0",
     game = Game(),
     hasRepentogon = REPENTOGON ~= nil,
 }
@@ -46,6 +46,7 @@ local features = {
     "enemies",
     "waves",
     "world",
+    "studio",
     "settings",
 }
 for _, name in ipairs(features) do

@@ -32,6 +32,19 @@ save.defaults = {
         mode = "clear", interval = 20, pause = 3, total = 10, endless = true, growth = 1, bossEvery = 5,
         reward = "pickup", lockDoors = true,
     },
+    -- Studio: overlay for videos, clean frame, profiles (profiles are not part of a profile).
+    studio = {
+        clean = false, cleanKey = Keyboard.KEY_F3,
+        timer = { show = false, x = 20, y = 200 },
+        showRules = false, rulesX = 300, rulesY = 40,
+        showCounters = false, countersX = 20, countersY = 60,
+        lines = {
+            { text = "", x = 20, y = 230, show = false },
+            { text = "", x = 20, y = 245, show = false },
+            { text = "", x = 20, y = 260, show = false },
+        },
+    },
+    profiles = {},
     -- Reward rules: room clear award multiplier/bonus, pickup multiplier, enemy drops.
     drops = {
         enabled = false, clearMult = 1, clearBonus = "none", noClearAward = false, bossItems = 0,
