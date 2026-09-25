@@ -22,26 +22,87 @@ local function spawnPickup(variant, subtype)
 end
 
 -- `floor` true/false overrides the "give as" setting (grid: Enter = inventory, Shift+Enter = floor).
-local function giveCollectible(id, name, floor)
+local function giveCollectible(id, name, floor, amount)
     if floor == nil then floor = mode.give == "pedestal" end
-    if floor then
-        spawnPickup(PickupVariant.PICKUP_COLLECTIBLE, id)
-    else
-        for _, p in ipairs(util.targets()) do p:AddCollectible(id, 0, true) end
+    amount = amount or 1
+    for _ = 1, amount do
+        if floor then
+            spawnPickup(PickupVariant.PICKUP_COLLECTIBLE, id)
+        else
+            for _, p in ipairs(util.targets()) do p:AddCollectible(id, 0, true) end
+        end
     end
     AC.save.pushRecent(AC.save.data.recent.items, id, 15)
-    AC.render.toast(t("given", name or util.collectibleName(id) or id))
+    AC.render.toast(t("given_n", name or util.collectibleName(id) or id, amount))
 end
 
-local function giveTrinket(id, name, floor)
+local function giveTrinket(id, name, floor, amount)
     if floor == nil then floor = mode.give == "pedestal" end
-    if floor then
-        spawnPickup(PickupVariant.PICKUP_TRINKET, id)
-    else
-        for _, p in ipairs(util.targets()) do p:AddTrinket(id, true) end
+    amount = amount or 1
+    for _ = 1, amount do
+        if floor then
+            spawnPickup(PickupVariant.PICKUP_TRINKET, id)
+        else
+            for _, p in ipairs(util.targets()) do p:AddTrinket(id, true) end
+        end
     end
-    AC.render.toast(t("given", name))
+    AC.render.toast(t("given_n", name, amount))
 end
+
+-- Put `amount` pickups of a kind at a world position (placing with the mouse).
+local function placePickup(variant, subtype, pos, amount)
+    local room = AC.game:GetRoom()
+    for i = 1, amount or 1 do
+        local p = room:FindFreePickupSpawnPosition(pos + Vector((i - 1) * 8, 0), 0, true)
+        Isaac.Spawn(EntityType.ENTITY_PICKUP, variant, subtype, p, Vector.Zero, nil)
+    end
+end
+feature.placePickup = placePickup
+
+-- Pool membership for the pool filter: exact with REPENTOGON, otherwise sampled from the live pool.
+local poolCache = {}
+local function poolSet(poolType)
+    if poolCache[poolType] then return poolCache[poolType] end
+    local set = {}
+    local pool = AC.game:GetItemPool()
+    if AC.hasRepentogon and pool.GetCollectiblesFromPool then
+        local ok, list = pcall(pool.GetCollectiblesFromPool, pool, poolType)
+        if ok and type(list) == "table" then
+            for _, e in ipairs(list) do set[e.itemID] = true end
+            poolCache[poolType] = set
+            return set
+        end
+    end
+    AC.poolSampling = true -- our pool filters must not interfere
+    local rng = RNG()
+    rng:SetSeed(7919 + poolType, 35)
+    for _ = 1, 1500 do set[pool:GetCollectible(poolType, false, rng:Next())] = true end
+    AC.poolSampling = false
+    set[CollectibleType.COLLECTIBLE_BREAKFAST] = nil -- the "pool is empty" fallback
+    poolCache[poolType] = set
+    return set
+end
+feature.poolSet = poolSet
+
+local POOLS = {
+    { "pool_treasure", "POOL_TREASURE" }, { "pool_shop", "POOL_SHOP" }, { "pool_boss", "POOL_BOSS" },
+    { "pool_devil", "POOL_DEVIL" }, { "pool_angel", "POOL_ANGEL" }, { "pool_secret", "POOL_SECRET" },
+    { "pool_curse", "POOL_CURSE" }, { "pool_library", "POOL_LIBRARY" }, { "pool_golden_chest", "POOL_GOLDEN_CHEST" },
+    { "pool_red_chest", "POOL_RED_CHEST" }, { "pool_beggar", "POOL_BEGGAR" }, { "pool_demon_beggar", "POOL_DEMON_BEGGAR" },
+    { "pool_planetarium", "POOL_PLANETARIUM" }, { "pool_ultra_secret", "POOL_ULTRA_SECRET" },
+}
+
+local function poolOptions()
+    local out = { { "all", -1 } }
+    for _, p in ipairs(POOLS) do
+        local present = false
+        for name in pairs(ItemPoolType) do if name == p[2] then present = true end end
+        if present then out[#out + 1] = { p[1], ItemPoolType[p[2]] } end
+    end
+    return out
+end
+
+local ITEM_TYPES = { passive = 1, active = 3, familiar = 4 }
 
 local function smeltTrinket(id, name)
     for _, p in ipairs(util.targets()) do
@@ -70,8 +131,13 @@ end
 
 local cardNames, pillNames = util.cardName, util.pillName
 
+feature.callbacks = {
+    { ModCallbacks.MC_POST_GAME_STARTED, function() poolCache = {} end },
+}
+
 feature.pages = {
     items = {
+        layout = "tiles",
         title = function() return t("m_items") end,
         build = function()
             return {
@@ -107,16 +173,45 @@ feature.pages = {
     },
     items_grid = AC.grid.page({
         title = function() return t("m_collectibles") end,
-        pickHint = "grid_give", altHint = "grid_floor",
+        pickHint = "grid_give", altHint = "grid_floor", amount = true,
+        chips = {
+            { id = "tier", label = "chip_tier", default = -1,
+              options = { { "all", -1 }, { "0", 0 }, { "1", 1 }, { "2", 2 }, { "3", 3 }, { "4", 4 } } },
+            { id = "type", label = "chip_type", default = "all",
+              options = { { "all", "all" }, { "type_passive", "passive" }, { "type_active", "active" },
+                          { "type_familiar", "familiar" } } },
+            { id = "pool", label = "chip_pool", default = -1, options = poolOptions },
+        },
+        filter = function(e, c)
+            if c.tier ~= -1 and e.quality ~= c.tier then return false end
+            if c.type ~= "all" and e.itype ~= ITEM_TYPES[c.type] then return false end
+            if c.pool ~= -1 and not poolSet(c.pool)[e.id] then return false end
+            return true
+        end,
+        sorts = {
+            { "sort_name", "name", AC.grid.byName },
+            { "sort_tier", "tier", function(a, b)
+                if a.quality == b.quality then return nil end
+                return a.quality > b.quality
+            end },
+        },
         entries = function()
             local list = {}
+            local config = Isaac.GetItemConfig()
             for id = 1, util.maxCollectible() do
-                local name = util.collectibleName(id)
+                local cfg = config:GetCollectible(id)
+                local name = cfg and util.collectibleName(id)
                 if name then
                     list[#list + 1] = { id = id, name = name, alias = util.collectibleAlias(id),
-                        desc = function() return util.collectibleDesc(id) end,
-                        icon = function(pos) return AC.icons.collectible(id, pos) end,
-                        pick = function(floor) giveCollectible(id, name, floor) end }
+                        quality = cfg.Quality or 0, itype = cfg.Type,
+                        desc = function()
+                            local d = util.collectibleDesc(id)
+                            local q = t("tier_n", cfg.Quality or 0)
+                            return d and (q .. "  " .. d) or q
+                        end,
+                        icon = id,
+                        pick = function(floor, amount) giveCollectible(id, name, floor, amount) end,
+                        place = function(pos, amount) placePickup(PickupVariant.PICKUP_COLLECTIBLE, id, pos, amount) end }
                 end
             end
             return list
@@ -155,7 +250,8 @@ feature.pages = {
     },
     trinkets_grid = AC.grid.page({
         title = function() return t("m_trinkets") end,
-        pickHint = "grid_give", altHint = "grid_floor",
+        pickHint = "grid_give", altHint = "grid_floor", amount = true,
+        sorts = { { "sort_name", "name", AC.grid.byName } },
         entries = function()
             local list = {}
             for id = 1, util.maxTrinket() do
@@ -163,8 +259,9 @@ feature.pages = {
                 if name then
                     list[#list + 1] = { id = id, name = name, alias = util.trinketAlias(id),
                         desc = function() return util.trinketDesc(id) end,
-                        icon = function(pos) return AC.icons.trinket(id, pos) end,
-                        pick = function(floor) giveTrinket(id, name, floor) end }
+                        icon = { trinket = id },
+                        pick = function(floor, amount) giveTrinket(id, name, floor, amount) end,
+                        place = function(pos, amount) placePickup(PickupVariant.PICKUP_TRINKET, id, pos, amount) end }
                 end
             end
             return list

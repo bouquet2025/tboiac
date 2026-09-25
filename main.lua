@@ -5,7 +5,7 @@ local mod = RegisterMod("TBOIAC", 1)
 
 TBOIAC = {
     mod = mod,
-    version = "0.8.0",
+    version = "0.9.0",
     game = Game(),
     hasRepentogon = REPENTOGON ~= nil,
 }

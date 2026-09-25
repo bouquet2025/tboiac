@@ -12,6 +12,7 @@ end
 
 feature.pages = {
     quick = {
+        layout = "tiles",
         title = function() return t("tab_quick") end,
         build = function()
             return {

@@ -47,6 +47,7 @@ local STATS = {
 
 feature.pages = {
     player = {
+        layout = "tiles",
         title = function() return t("m_player") end,
         build = function()
             local targets = { { t("target_all"), 0 } }

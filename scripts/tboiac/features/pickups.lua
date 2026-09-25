@@ -62,7 +62,18 @@ end
 feature.pages = {
     pickups_grid = AC.grid.page({
         title = function() return t("m_pickups") end,
-        pickHint = "grid_spawn", altHint = "grid_five",
+        pickHint = "grid_spawn", amount = true,
+        discover = function()
+            local jobs = {}
+            for _, g in ipairs(GROUPS) do
+                for _, p in ipairs(g[2]) do
+                    if p[2] ~= 0 then
+                        jobs[#jobs + 1] = { key = "5." .. p[2] .. "." .. p[3], t = 5, v = p[2], s = p[3] }
+                    end
+                end
+            end
+            AC.icons.discover(jobs)
+        end,
         entries = function()
             local out = {}
             for _, g in ipairs(GROUPS) do
@@ -71,17 +82,23 @@ feature.pages = {
                     local name = t(p[1])
                     out[#out + 1] = { name = name,
                         icon = function(pos) return AC.icons.entityKey(key, 5, p[2], pos + Vector(0, 8), 1) end,
-                        pick = function(five)
+                        pick = function(_, amount)
                             local n = state.count
-                            if five then state.count = 5 end
+                            state.count = amount or 1
                             spawn(p[2], p[3], name)
                             state.count = n
+                        end,
+                        place = function(pos, amount)
+                            local room = AC.game:GetRoom()
+                            for k = 1, amount or 1 do
+                                local at = room:FindFreePickupSpawnPosition(pos + Vector((k - 1) * 6, 0), 0, true)
+                                Isaac.Spawn(EntityType.ENTITY_PICKUP, p[2], p[3], at, Vector.Zero, nil)
+                            end
                         end }
                 end
             end
             return out
         end,
-        extra = function() return { countItem() } end,
     }),
     pickups = {
         title = function() return t("m_pickups") end,

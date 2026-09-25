@@ -30,7 +30,7 @@ local busy = false -- our own GetCollectible calls re-enter the callback
 
 local function onGetCollectible(_, selected, poolType, decrease, seed)
     local s = S()
-    if not s.enabled or busy then return nil end
+    if not s.enabled or busy or AC.poolSampling then return nil end
     for _, r in ipairs(s.replace) do
         if r[1] == selected then return r[2] end
     end
