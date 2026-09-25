@@ -80,6 +80,7 @@ feature.pages = {
                 menu.link(t("m_smelt"), "items_smelt"),
                 menu.link(t("m_cards"), "items_cards"),
                 menu.link(t("m_pills"), "items_pills"),
+                menu.link(t("m_pools"), "pools"),
                 menu.action(t("reroll_pedestals"), function() useItem(CollectibleType.COLLECTIBLE_D6) end),
                 menu.action(t("reroll_inventory"), function() useItem(CollectibleType.COLLECTIBLE_D4) end),
                 menu.action(t("reroll_pickups"), function() useItem(CollectibleType.COLLECTIBLE_D20) end),

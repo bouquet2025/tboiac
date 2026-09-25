@@ -15,15 +15,100 @@ local function position(mode, ctx)
     return player(ctx).Position
 end
 
-local function freePos(mode, ctx)
-    return Isaac.GetFreeNearPosition(position(mode, ctx) + Vector(math.random(-20, 20), math.random(-20, 20)), 30)
+-- Offsets of `count` points arranged in a formation, `spacing` pixels apart.
+local function formation(kind, count, spacing)
+    local out = {}
+    if kind == "circle" then
+        local r = math.max(spacing, spacing * count / (2 * math.pi))
+        for i = 1, count do out[i] = Vector.FromAngle(i * 360 / count) * r end
+    elseif kind == "line_h" or kind == "line_v" then
+        for i = 1, count do
+            local d = (i - (count + 1) / 2) * spacing
+            out[i] = kind == "line_h" and Vector(d, 0) or Vector(0, d)
+        end
+    elseif kind == "cross" or kind == "diag" then
+        local start = kind == "cross" and 0 or 45
+        for i = 1, count do
+            local ring = math.floor((i - 1) / 4) + 1
+            out[i] = Vector.FromAngle(start + ((i - 1) % 4) * 90) * (spacing * ring)
+        end
+    elseif kind == "grid" then
+        local side = math.ceil(math.sqrt(count))
+        for i = 1, count do
+            local x, y = (i - 1) % side, (i - 1) // side
+            out[i] = Vector((x - (side - 1) / 2) * spacing, (y - (side - 1) / 2) * spacing)
+        end
+    else
+        for i = 1, count do out[i] = Vector(math.random(-spacing, spacing), math.random(-spacing, spacing)) end
+    end
+    return out
+end
+
+-- Spawn positions for `count` things around `base`, kept inside the room.
+local function spawnPositions(base, p, count)
+    local room = AC.game:GetRoom()
+    local list = {}
+    for i, off in ipairs(formation(p.formation or "random", count, p.spacing or 50)) do
+        local pos = room:GetClampedPosition(base + off, 20)
+        if (p.formation or "random") == "random" then pos = Isaac.GetFreeNearPosition(pos, 30) end
+        list[i] = pos
+    end
+    return list
 end
 
 local function randomItem()
     return AC.game:GetItemPool():GetCollectible(ItemPoolType.POOL_TREASURE, true, Random())
 end
 
-local function npcOf(ctx) return ctx.entity and ctx.entity:ToNPC() end
+-- Entities an entity action applies to (see P.TARGETS).
+local function targets(p, ctx)
+    local mode = p.target or "trigger"
+    if mode == "trigger" then return { ctx.entity } end
+    if mode == "label" then
+        local out = {}
+        for _, e in ipairs(Isaac.GetRoomEntities()) do
+            if engine.hasLabel(e, p.name) then out[#out + 1] = e end
+        end
+        return out
+    end
+    if mode == "list" then return engine.listEntities(p.name) end
+    if mode == "pickups" or mode == "items" then
+        local out = {}
+        for _, e in ipairs(Isaac.FindByType(EntityType.ENTITY_PICKUP)) do
+            local isItem = e.Variant == PickupVariant.PICKUP_COLLECTIBLE
+            if (mode == "items") == isItem then out[#out + 1] = e end
+        end
+        return out
+    end
+    local enemies = util.enemies()
+    if mode == "enemies" then return enemies end
+    local origin = (ctx.entity or player(ctx)).Position
+    if mode == "nearest" then
+        local best, bestDist
+        for _, npc in ipairs(enemies) do
+            local d = npc.Position:Distance(origin)
+            if (not ctx.entity or GetPtrHash(npc) ~= GetPtrHash(ctx.entity)) and (not best or d < bestDist) then
+                best, bestDist = npc, d
+            end
+        end
+        return { best }
+    end
+    local out = {}
+    for _, npc in ipairs(enemies) do
+        if npc.Position:Distance(origin) <= p.radius then out[#out + 1] = npc end
+    end
+    return out
+end
+
+-- Define an action applied to every target entity: fn(entity, p, ctx).
+local function entityAction(id, label, params, fn)
+    def({ id = id, label = label, params = P.join(P.target(), params or {}),
+        run = function(p, ctx)
+            for _, e in ipairs(targets(p, ctx)) do
+                if e and e:Exists() then fn(e, p, ctx) end
+            end
+        end })
+end
 
 local COLORS = {
     red = { 1, 0.3, 0.3, 1, 0.4, 0, 0 }, green = { 0.3, 1, 0.3, 1, 0, 0.3, 0 },
@@ -32,55 +117,59 @@ local COLORS = {
     ghost = { 1, 1, 1, 0.35, 0, 0, 0 }, reset = { 1, 1, 1, 1, 0, 0, 0 },
 }
 
+local function setupNpc(e, p, ctx)
+    local npc = e and e:ToNPC()
+    if not npc then return end
+    if p.champion and not npc:IsBoss() then npc:MakeChampion(Random(), -1, true) end
+    if p.friendly then
+        npc:AddCharmed(EntityRef(player(ctx)), -1)
+        npc:AddEntityFlags(EntityFlag.FLAG_PERSISTENT)
+    end
+    if p.label and p.label ~= "" then engine.setLabel(npc, p.label, true) end
+end
+
 -- Spawning -------------------------------------------------------------------------------------
 
+local SPAWN_OPTS = {
+    P.toggle("champion", "as_champion"), P.toggle("friendly", "friendly_spawn"), P.text("label", "give_label", ""),
+}
+
 def({ id = "spawn_entity", label = "a_spawn_entity",
-    params = { P.entity("ent", "entity", "10.0.0"), P.number("count", "count", 1, 1, 30),
-               P.choice("pos", "position", "random", P.POSITION), P.toggle("champion", "as_champion"),
-               P.toggle("friendly", "friendly_spawn") },
+    params = P.join({ P.entity("ent", "entity", "10.0.0"), P.number("count", "count", 1, 1, 30),
+                      P.choice("pos", "position", "random", P.POSITION) }, P.formation(), SPAWN_OPTS),
     run = function(p, ctx)
         local et, ev, es = P.parseEntity(p.ent)
-        for _ = 1, p.count do
-            local e = mark(Isaac.Spawn(et, ev, es, freePos(p.pos, ctx), Vector.Zero, nil))
-            local npc = e and e:ToNPC()
-            if npc then
-                if p.champion and not npc:IsBoss() then npc:MakeChampion(Random(), -1, true) end
-                if p.friendly then
-                    npc:AddCharmed(EntityRef(player(ctx)), -1)
-                    npc:AddEntityFlags(EntityFlag.FLAG_PERSISTENT)
-                end
-            end
+        for _, pos in ipairs(spawnPositions(position(p.pos, ctx), p, p.count)) do
+            setupNpc(mark(Isaac.Spawn(et, ev, es, pos, Vector.Zero, nil)), p, ctx)
         end
     end })
 
 def({ id = "spawn_random", label = "a_spawn_random",
-    params = { P.choice("kind", "kind", "boss", { { "kind_boss", "boss" }, { "kind_enemy", "enemy" } }),
-               P.number("count", "count", 1, 1, 10), P.choice("pos", "position", "random", P.POSITION),
-               P.toggle("champion", "as_champion") },
+    params = P.join({ P.choice("kind", "kind", "boss", { { "kind_boss", "boss" }, { "kind_enemy", "enemy" } }),
+                      P.number("count", "count", 1, 1, 10), P.choice("pos", "position", "random", P.POSITION) },
+                    P.formation(), SPAWN_OPTS),
     run = function(p, ctx)
         local list = p.kind == "enemy" and AC.data.ENEMIES or AC.data.BOSSES
-        for _ = 1, p.count do
+        for _, pos in ipairs(spawnPositions(position(p.pos, ctx), p, p.count)) do
             local pick = list[math.random(#list)]
-            local e = mark(Isaac.Spawn(pick[2], pick[3], 0, freePos(p.pos, ctx), Vector.Zero, nil))
-            local npc = e and e:ToNPC()
-            if npc and p.champion and not npc:IsBoss() then npc:MakeChampion(Random(), -1, true) end
+            setupNpc(mark(Isaac.Spawn(pick[2], pick[3], 0, pos, Vector.Zero, nil)), p, ctx)
         end
     end })
 
-def({ id = "entity_clone", label = "a_entity_clone", params = { P.number("count", "count", 1, 1, 20) },
-    run = function(p, ctx)
-        local e = ctx.entity
-        if not e or e.Type == EntityType.ENTITY_PLAYER then return end
-        for i = 1, p.count do
-            local pos = Isaac.GetFreeNearPosition(e.Position + Vector.FromAngle(i * 360 / p.count) * 40, 20)
-            mark(Isaac.Spawn(e.Type, e.Variant, e.SubType, pos, Vector.Zero, nil))
+entityAction("entity_clone", "a_entity_clone", P.join({ P.number("count", "count", 1, 1, 20) },
+    { P.choice("formation", "formation", "circle", P.FORMATIONS), P.number("spacing", "spacing_px", 40, 10, 300, 5) }),
+    function(e, p)
+        if e.Type == EntityType.ENTITY_PLAYER then return end
+        for _, pos in ipairs(spawnPositions(e.Position, p, p.count)) do
+            local copy = mark(Isaac.Spawn(e.Type, e.Variant, e.SubType, pos, Vector.Zero, nil))
+            local labels = e:GetData().tboiacLabels
+            if copy and labels then copy:GetData().tboiacLabels = AC.util.copy(labels) end
         end
-    end })
+    end)
 
-def({ id = "replace_entity", label = "a_replace_entity", params = { P.entity("ent", "entity", "10.0.0") },
-    run = function(p, ctx)
-        local e = ctx.entity
-        if not e then return end
+entityAction("replace_entity", "a_replace_entity", { P.entity("ent", "entity", "10.0.0") },
+    function(e, p)
+        if e.Type == EntityType.ENTITY_PLAYER then return end
         local et, ev, es = P.parseEntity(p.ent)
         local pickup = e:ToPickup()
         if pickup and et == EntityType.ENTITY_PICKUP then
@@ -89,24 +178,25 @@ def({ id = "replace_entity", label = "a_replace_entity", params = { P.entity("en
         end
         mark(Isaac.Spawn(et, ev, es, e.Position, e.Velocity, nil))
         e:Remove()
-    end })
+    end)
 
-def({ id = "set_item", label = "a_set_item", params = { P.catalog("id", "item", 0, "collectible", "random") },
-    run = function(p, ctx)
-        local pickup = ctx.entity and ctx.entity:ToPickup()
+entityAction("set_item", "a_set_item", { P.catalog("id", "item", 0, "collectible", "random") },
+    function(e, p)
+        local pickup = e:ToPickup()
         if not pickup or pickup.Variant ~= PickupVariant.PICKUP_COLLECTIBLE or pickup.SubType == 0 then return end
         local id = p.id ~= 0 and p.id or randomItem()
         if pickup.SubType ~= id then
             pickup:Morph(EntityType.ENTITY_PICKUP, PickupVariant.PICKUP_COLLECTIBLE, id, true, true, false)
         end
-    end })
+    end)
 
 def({ id = "spawn_pickup", label = "a_spawn_pickup",
-    params = { P.number("variant", "variant", 0, 0, 1000), P.number("subtype", "subtype", 0, 0, 1000),
-               P.number("count", "count", 1, 1, 30), P.choice("pos", "position", "player", P.POSITION) },
+    params = P.join({ P.number("variant", "variant", 0, 0, 1000), P.number("subtype", "subtype", 0, 0, 1000),
+                      P.number("count", "count", 1, 1, 30), P.choice("pos", "position", "player", P.POSITION) },
+                    P.formation()),
     run = function(p, ctx)
-        for _ = 1, p.count do
-            mark(Isaac.Spawn(EntityType.ENTITY_PICKUP, p.variant, p.subtype, freePos(p.pos, ctx), Vector.Zero, nil))
+        for _, pos in ipairs(spawnPositions(position(p.pos, ctx), p, p.count)) do
+            mark(Isaac.Spawn(EntityType.ENTITY_PICKUP, p.variant, p.subtype, pos, Vector.Zero, nil))
         end
     end })
 
@@ -191,57 +281,48 @@ def({ id = "kill_player", label = "a_kill_player", run = function(_, ctx) player
 def({ id = "change_character", label = "a_change_character", params = { P.choice("type", "character", 0, P.characters) },
     run = function(p, ctx) player(ctx):ChangePlayerType(p.type) end })
 
--- Trigger entity -------------------------------------------------------------------------------
+-- Entities (target: trigger, nearest enemy, radius, all enemies, pickups, items, label, list) -----
 
-def({ id = "entity_kill", label = "a_entity_kill", run = function(_, ctx) if ctx.entity then ctx.entity:Kill() end end })
-def({ id = "entity_remove", label = "a_entity_remove", run = function(_, ctx) if ctx.entity then ctx.entity:Remove() end end })
+entityAction("entity_kill", "a_entity_kill", nil, function(e) e:Kill() end)
+entityAction("entity_remove", "a_entity_remove", nil, function(e) e:Remove() end)
 
-def({ id = "entity_damage", label = "a_entity_damage", params = { P.number("amount", "amount", 10, 1, 1000, 5) },
-    run = function(p, ctx)
-        if ctx.entity then ctx.entity:TakeDamage(p.amount, 0, EntityRef(player(ctx)), 0) end
-    end })
+entityAction("entity_damage", "a_entity_damage", { P.number("amount", "amount", 10, 1, 1000, 5) },
+    function(e, p, ctx) e:TakeDamage(p.amount, 0, EntityRef(player(ctx)), 0) end)
 
-def({ id = "entity_heal", label = "a_entity_heal",
-    run = function(_, ctx) if ctx.entity then ctx.entity.HitPoints = ctx.entity.MaxHitPoints end end })
+entityAction("entity_heal", "a_entity_heal", nil, function(e) e.HitPoints = e.MaxHitPoints end)
 
-def({ id = "entity_champion", label = "a_entity_champion",
-    run = function(_, ctx)
-        local npc = npcOf(ctx)
-        if npc and not npc:IsBoss() then npc:MakeChampion(Random(), -1, true) end
-    end })
+entityAction("entity_champion", "a_entity_champion", nil, function(e)
+    local npc = e:ToNPC()
+    if npc and not npc:IsBoss() then npc:MakeChampion(Random(), -1, true) end
+end)
 
-def({ id = "entity_charm", label = "a_entity_charm",
-    run = function(_, ctx)
-        local npc = npcOf(ctx)
-        if npc then npc:AddCharmed(EntityRef(player(ctx)), -1) end
-    end })
+entityAction("entity_charm", "a_entity_charm", nil, function(e, _, ctx)
+    local npc = e:ToNPC()
+    if npc then npc:AddCharmed(EntityRef(player(ctx)), -1) end
+end)
 
-def({ id = "entity_freeze", label = "a_entity_freeze", params = { P.number("seconds", "seconds", 3, 0.5, 60, 0.5) },
-    run = function(p, ctx)
-        local npc = npcOf(ctx)
+entityAction("entity_freeze", "a_entity_freeze", { P.number("seconds", "seconds", 3, 0.5, 60, 0.5) },
+    function(e, p, ctx)
+        local npc = e:ToNPC()
         if npc then npc:AddFreeze(EntityRef(player(ctx)), math.floor(p.seconds * 30)) end
-    end })
+    end)
 
-def({ id = "entity_scale", label = "a_entity_scale", params = { P.number("scale", "size", 2, 0.25, 5, 0.25) },
-    run = function(p, ctx)
-        local e = ctx.entity
-        if not e then return end
+entityAction("entity_scale", "a_entity_scale", { P.number("scale", "size", 2, 0.25, 5, 0.25) },
+    function(e, p)
         e.SpriteScale = Vector(p.scale, p.scale)
         e.SizeMulti = Vector(p.scale, p.scale)
-    end })
+    end)
 
-def({ id = "entity_color", label = "a_entity_color", params = { P.choice("color", "color", "red", P.COLORS) },
-    run = function(p, ctx)
+entityAction("entity_color", "a_entity_color", { P.choice("color", "color", "red", P.COLORS) },
+    function(e, p)
         local c = COLORS[p.color]
-        if ctx.entity then ctx.entity.Color = Color(c[1], c[2], c[3], c[4], c[5], c[6], c[7]) end
-    end })
+        e.Color = Color(c[1], c[2], c[3], c[4], c[5], c[6], c[7])
+    end)
 
-def({ id = "entity_push", label = "a_entity_push",
-    params = { P.choice("dir", "direction", "away", { { "dir_away", "away" }, { "dir_toward", "toward" }, { "dir_random", "random" } }),
-               P.number("speed", "speed", 15, 1, 100) },
-    run = function(p, ctx)
-        local e = ctx.entity
-        if not e then return end
+entityAction("entity_push", "a_entity_push",
+    { P.choice("dir", "direction", "away", { { "dir_away", "away" }, { "dir_toward", "toward" }, { "dir_random", "random" } }),
+      P.number("speed", "speed", 15, 1, 100) },
+    function(e, p, ctx)
         local d
         if p.dir == "random" then d = Vector.FromAngle(math.random(360))
         else
@@ -249,7 +330,22 @@ def({ id = "entity_push", label = "a_entity_push",
             if p.dir == "toward" then d = d * -1 end
         end
         e:AddVelocity(d * p.speed)
-    end })
+    end)
+
+entityAction("label_add", "a_label_add", { P.text("label", "label_name", "a") },
+    function(e, p) engine.setLabel(e, p.label, true) end)
+
+entityAction("label_remove", "a_label_remove", { P.text("label", "label_name", "a") },
+    function(e, p) engine.setLabel(e, p.label, false) end)
+
+entityAction("list_add", "a_list_add", { P.text("list", "list_name", "a") },
+    function(e, p) engine.addToList(p.list, e) end)
+
+entityAction("list_remove", "a_list_remove", { P.text("list", "list_name", "a") },
+    function(e, p) engine.removeFromList(p.list, e) end)
+
+def({ id = "list_clear", label = "a_list_clear", params = { P.text("list", "list_name", "a") },
+    run = function(p) engine.lists[p.list] = nil end })
 
 def({ id = "explode", label = "a_explode",
     params = { P.choice("pos", "position", "entity", P.POSITION), P.number("damage", "amount", 40, 0, 1000, 5) },
@@ -374,6 +470,13 @@ def({ id = "rule_toggle", label = "a_rule_toggle",
         if not r then return end
         if p.mode == "toggle" then r.enabled = not r.enabled else r.enabled = p.mode == "on" end
     end })
+
+-- Stops the remaining actions of this firing (with a chance, for "maybe the rest happens").
+def({ id = "stop", label = "a_stop", params = { P.number("chance", "percent", 100, 1, 100, 5) },
+    run = function(p, ctx) if math.random(100) <= p.chance then ctx.stop = true end end })
+
+def({ id = "pool_remove", label = "a_pool_remove", params = { P.catalog("id", "item", 1, "collectible") },
+    run = function(p) AC.game:GetItemPool():RemoveCollectible(p.id) end })
 
 def({ id = "command", label = "a_command", params = { P.text("cmd", "command", "") },
     run = function(p) if p.cmd ~= "" then util.command(p.cmd) end end })

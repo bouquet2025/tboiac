@@ -70,6 +70,25 @@ presets.list = {
             { act("time_mode", { mode = 0, seconds = 0 }) },
             { conds = { cond("room_type", { roomType = RoomType.ROOM_BOSS }, true) } }),
     } },
+    { name = "pr_marked", rules = {
+        rule("prr_mark_enemies", "entity_spawned", nil,
+            { act("label_add", { target = "trigger", label = "marked" }),
+              act("entity_color", { target = "trigger", color = "gold" }) },
+            { filter = { mode = "enemy", t = 10, v = -1, s = -1 }, conds = { cond("chance", { value = 20 }) } }),
+        rule("prr_marked_drop", "entity_killed", nil, { act("spawn_item", { id = 0, pos = "entity" }) },
+            { filter = { mode = "label", name = "marked", t = 10, v = -1, s = -1 } }),
+    } },
+    { name = "pr_chain", rules = {
+        rule("prr_chain_hit", "enemy_hurt", nil,
+            { act("entity_damage", { target = "radius", radius = 90, amount = 3 }),
+              act("entity_color", { target = "radius", radius = 90, color = "blue" }) },
+            { conds = { cond("cooldown", { seconds = 0.5 }) } }),
+    } },
+    { name = "pr_escort", rules = {
+        rule("prr_m_escort", "key_press", { key = Keyboard.KEY_M },
+            { act("spawn_entity", { ent = "18.0.0", count = 8, pos = "player", formation = "circle",
+                                    spacing = 40, friendly = true }) }),
+    } },
     { name = "pr_counter_demo", rules = {
         rule("prr_count_kills", "entity_killed", nil, { act("counter", { name = "kills", op = "add", value = 1 }) },
             { filter = { mode = "enemy", t = 10, v = -1, s = -1 } }),

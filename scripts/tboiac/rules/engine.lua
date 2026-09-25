@@ -21,6 +21,7 @@ local engine = {
     queue = {},          -- delayed actions { at = frame, act, ctx, rule }
     room = { fired = {} },
     last = {},           -- rule key -> engine frame of last fire (not saved)
+    lists = {},          -- list name -> { entities } for the current room (not saved)
     frame = 0,
     firesThisFrame = 0,
     depth = 0,
@@ -120,6 +121,8 @@ function engine.matchFilter(filter, entity)
     local npc = entity:ToNPC()
     if mode == "enemy" then return npc ~= nil and npc:IsVulnerableEnemy() and not npc:IsBoss() end
     if mode == "boss" then return npc ~= nil and npc:IsBoss() end
+    if mode == "label" then return engine.hasLabel(entity, filter.name or "a") end
+    if mode == "list" then return engine.inList(filter.name or "a", entity) end
     if mode == "exact" then
         return entity.Type == filter.t
             and (filter.v < 0 or entity.Variant == filter.v)
@@ -154,7 +157,7 @@ end
 
 function engine.runAction(act, ctx, rule)
     local def = engine.actions[act.id]
-    if not def then return end
+    if not def or ctx.stop then return end
     if ctx.entity and not ctx.entity:Exists() then ctx.entity = nil end
     local ok, err = pcall(def.run, withDefaults(def, act.p), ctx, rule)
     if not ok then
@@ -170,6 +173,7 @@ local function fire(rule, ctx)
     engine.last[k] = engine.frame
     local delay = 0
     for _, act in ipairs(rule.acts or {}) do
+        if ctx.stop then break end
         delay = delay + math.max(0, act.delay or 0)
         if delay > 0 then
             table.insert(engine.queue, { at = engine.frame + math.floor(delay * 30), act = act, ctx = ctx, rule = rule })
@@ -244,6 +248,53 @@ end
 
 function engine.onNewRoom()
     engine.room = { fired = {} }
+    engine.lists = {}
+end
+
+-- Labels: named tags stored on an entity (live as long as the entity does).
+function engine.hasLabel(e, name)
+    local labels = e and e:GetData().tboiacLabels
+    return labels ~= nil and labels[name] == true
+end
+
+function engine.setLabel(e, name, on)
+    local data = e:GetData()
+    data.tboiacLabels = data.tboiacLabels or {}
+    data.tboiacLabels[name] = on or nil
+end
+
+-- Entity lists: named groups of entities for the current room.
+function engine.listEntities(name)
+    local list = engine.lists[name] or {}
+    local alive = {}
+    for _, e in ipairs(list) do
+        if e:Exists() and not e:IsDead() then alive[#alive + 1] = e end
+    end
+    engine.lists[name] = alive
+    return alive
+end
+
+function engine.inList(name, e)
+    if not e then return false end
+    local h = GetPtrHash(e)
+    for _, x in ipairs(engine.listEntities(name)) do
+        if GetPtrHash(x) == h then return true end
+    end
+    return false
+end
+
+function engine.addToList(name, e)
+    if engine.inList(name, e) then return end
+    engine.lists[name] = engine.lists[name] or {}
+    table.insert(engine.lists[name], e)
+end
+
+function engine.removeFromList(name, e)
+    local h = GetPtrHash(e)
+    local list = engine.lists[name] or {}
+    for i = #list, 1, -1 do
+        if GetPtrHash(list[i]) == h then table.remove(list, i) end
+    end
 end
 
 -- New run (not continued): reset run state and drop "this run only" rules.

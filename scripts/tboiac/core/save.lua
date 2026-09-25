@@ -20,6 +20,8 @@ save.defaults = {
     world = { noCurses = false },
     recent = { items = {}, entities = {} },
     rules = { enabled = true, list = {}, nextId = 1 },
+    -- Item pool filters: black/white are id lists, replace is a list of { from, to }.
+    pools = { enabled = false, black = {}, white = {}, replace = {}, qmin = 0, qmax = 4 },
     -- Per-run rule state; wiped when a new run starts (kept on continue).
     run = {
         flags = {}, counters = {}, fired = {}, matches = {},

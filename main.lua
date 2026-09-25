@@ -5,7 +5,7 @@ local mod = RegisterMod("TBOIAC", 1)
 
 TBOIAC = {
     mod = mod,
-    version = "0.2.0",
+    version = "0.3.0",
     game = Game(),
     hasRepentogon = REPENTOGON ~= nil,
 }
@@ -36,6 +36,7 @@ AC.registry.register(load("rules.editor"))
 local features = {
     "player",
     "items",
+    "pools",
     "pickups",
     "time",
     "enemies",

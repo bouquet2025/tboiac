@@ -114,4 +114,26 @@ def({ id = "enemies_count", label = "c_enemies_count",
     params = { P.choice("op", "compare", "eq", P.COMPARE), P.number("value", "amount", 0, 0, 200) },
     check = function(p) return engine.compare(#AC.util.enemies(), p.op, p.value) end })
 
+def({ id = "has_label", label = "c_has_label", params = { P.text("label", "label_name", "a") },
+    check = function(p, ctx) return engine.hasLabel(ctx.entity, p.label) end })
+
+def({ id = "in_list", label = "c_in_list", params = { P.text("list", "list_name", "a") },
+    check = function(p, ctx) return engine.inList(p.list, ctx.entity) end })
+
+def({ id = "list_size", label = "c_list_size",
+    params = { P.text("list", "list_name", "a"), P.choice("op", "compare", "ge", P.COMPARE),
+               P.number("value", "amount", 3, 0, 500) },
+    check = function(p) return engine.compare(#engine.listEntities(p.list), p.op, p.value) end })
+
+def({ id = "labeled_count", label = "c_labeled_count",
+    params = { P.text("label", "label_name", "a"), P.choice("op", "compare", "eq", P.COMPARE),
+               P.number("value", "amount", 0, 0, 500) },
+    check = function(p)
+        local n = 0
+        for _, e in ipairs(Isaac.GetRoomEntities()) do
+            if engine.hasLabel(e, p.label) and not e:IsDead() then n = n + 1 end
+        end
+        return engine.compare(n, p.op, p.value)
+    end })
+
 return true

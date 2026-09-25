@@ -62,6 +62,42 @@ P.COLORS = {
     { "col_black", "black" }, { "col_white", "white" }, { "col_ghost", "ghost" }, { "col_reset", "reset" },
 }
 
+-- Who an entity action applies to. `name` names a label or list, `radius` is for "radius".
+P.TARGETS = {
+    { "tg_trigger", "trigger" }, { "tg_nearest", "nearest" }, { "tg_radius", "radius" },
+    { "tg_enemies", "enemies" }, { "tg_pickups", "pickups" }, { "tg_items", "items" },
+    { "tg_label", "label" }, { "tg_list", "list" },
+}
+
+function P.target()
+    return {
+        P.choice("target", "target", "trigger", P.TARGETS),
+        P.text("name", "label_or_list", "a"),
+        P.number("radius", "radius_px", 120, 10, 1000, 10),
+    }
+end
+
+P.FORMATIONS = {
+    { "fm_random", "random" }, { "fm_circle", "circle" }, { "fm_line_h", "line_h" }, { "fm_line_v", "line_v" },
+    { "fm_cross", "cross" }, { "fm_diag", "diag" }, { "fm_grid", "grid" },
+}
+
+function P.formation()
+    return {
+        P.choice("formation", "formation", "random", P.FORMATIONS),
+        P.number("spacing", "spacing_px", 50, 10, 300, 5),
+    }
+end
+
+-- Concatenate param lists.
+function P.join(...)
+    local out = {}
+    for _, list in ipairs({ ... }) do
+        for _, spec in ipairs(list) do out[#out + 1] = spec end
+    end
+    return out
+end
+
 P.TIME_MODES = { { "time_normal", 0 }, { "time_slow", 1 }, { "time_fast", 2 } }
 
 function P.roomTypes(withAny)

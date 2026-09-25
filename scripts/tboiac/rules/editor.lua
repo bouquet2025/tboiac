@@ -104,7 +104,7 @@ end
 
 local FILTER_MODES = {
     { "f_any", "any" }, { "f_enemy", "enemy" }, { "f_boss", "boss" }, { "f_player", "player" },
-    { "f_pickup", "pickup" }, { "f_exact", "exact" },
+    { "f_pickup", "pickup" }, { "f_exact", "exact" }, { "f_label", "label" }, { "f_list", "list" },
 }
 
 local SCOPES = { { "scope_always", "always" }, { "scope_run", "run" }, { "scope_chapter", "chapter" } }
@@ -221,6 +221,10 @@ rulePage = function(rule)
                             return out
                         end,
                         get = function() return f.mode end, set = function(v) f.mode = v end }
+                    if f.mode == "label" or f.mode == "list" then
+                        items[#items + 1] = { kind = "text", label = "  " .. t(f.mode == "label" and "label_name" or "list_name"),
+                            get = function() return f.name or "a" end, set = function(v) f.name = v end }
+                    end
                     if f.mode == "exact" then
                         for _, k in ipairs({ { "t", "type" }, { "v", "variant" }, { "s", "subtype" } }) do
                             items[#items + 1] = { kind = "number", label = "  " .. t(k[2]), min = -1, max = 5000, step = 1,

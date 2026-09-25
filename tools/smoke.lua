@@ -94,7 +94,8 @@ InputHook = enum("InputHook", { IS_ACTION_PRESSED = 0, IS_ACTION_TRIGGERED = 1, 
 local callbackNames = { "MC_POST_RENDER", "MC_INPUT_ACTION", "MC_POST_GAME_STARTED", "MC_PRE_GAME_EXIT",
     "MC_ENTITY_TAKE_DMG", "MC_EVALUATE_CACHE", "MC_POST_PEFFECT_UPDATE", "MC_POST_UPDATE",
     "MC_POST_NEW_ROOM", "MC_NPC_UPDATE", "MC_POST_CURSE_EVAL", "MC_POST_NEW_LEVEL", "MC_POST_NPC_DEATH",
-    "MC_POST_PICKUP_UPDATE", "MC_USE_ITEM", "MC_USE_CARD", "MC_USE_PILL", "MC_POST_FIRE_TEAR" }
+    "MC_POST_PICKUP_UPDATE", "MC_USE_ITEM", "MC_USE_CARD", "MC_USE_PILL", "MC_POST_FIRE_TEAR",
+    "MC_POST_GET_COLLECTIBLE" }
 local cbEnum = {}
 for i, n in ipairs(callbackNames) do cbEnum[n] = i end
 ModCallbacks = enum("ModCallbacks", cbEnum)
@@ -172,7 +173,11 @@ local room = obj({ GetGridSize = function() return 3 end, GetDoor = function() r
     GetRandomPosition = function() return vec(10, 10) end, GetCenterPos = function() return vec(20, 20) end,
     GetGridEntity = function() return nil end, FindFreeTilePosition = function() return vec(0, 0) end,
     FindFreePickupSpawnPosition = function() return vec(0, 0) end })
-local game = obj({ GetNumPlayers = function() return 1 end, GetLevel = function() return level end,
+-- Item pool that hands out ids 1, 2, 3 in turn.
+local poolNext = 0
+local itemPool = obj({ GetCollectible = function() poolNext = poolNext % 3 + 1 return poolNext end })
+RNG = function() return obj({ Next = function() return 7 end, RandomInt = function(_, n) return 0 end }) end
+local game = obj({ GetItemPool = function() return itemPool end, GetNumPlayers = function() return 1 end, GetLevel = function() return level end,
     GetRoom = function() return room end, GetSeeds = function() return obj({ GetStartSeedString = function() return "ABCD 1234" end }) end,
     TimeCounter = 0 })
 Game = function() return game end
@@ -180,7 +185,10 @@ local function list(n) return obj({ Size = n }) end
 local itemConfig = obj({
     GetCollectibles = function() return list(4) end, GetTrinkets = function() return list(3) end,
     GetCards = function() return list(3) end, GetPillEffects = function() return list(3) end,
-    GetCollectible = function(_, id) return { Name = id == 2 and "The Sad Onion" or "#ITEM_" .. id .. "_NAME" } end,
+    GetCollectible = function(_, id)
+        if type(id) ~= "number" or id < 1 or id > 3 then return nil end
+        return { Name = id == 2 and "The Sad Onion" or "#ITEM_" .. id .. "_NAME", Quality = id - 1 }
+    end,
     GetTrinket = function(_, id) return { Name = "#TRINKET_" .. id .. "_NAME" } end,
     GetCard = function(_, id) return { Name = "#CARD_" .. id .. "_NAME" } end,
     GetPillEffect = function(_, id) return { Name = "#PILL_" .. id .. "_NAME" } end,
@@ -475,6 +483,47 @@ local loop = E.newRule("entity_killed")
 loop.acts = { { id = "counter", p = { name = "loop", op = "add", value = 1 } } }
 for _ = 1, 500 do E.emit("entity_killed", { entity = npc }) end
 if E.counter("loop") > E.MAX_FIRES_PER_FRAME then fail("loop guard did not cap fires") end
+
+-- Item pools.
+do
+    local pools = AC.save.data.pools
+    local get = function(selected)
+        for _, f in ipairs(AC.registry.features) do
+            if f.id == "pools" then return f.onGetCollectible(AC.mod, selected, 0, true, 123) end
+        end
+    end
+    pools.enabled = true
+    if get(2) ~= nil then fail("pools: allowed item was changed") end
+    pools.black = { 2 }
+    local r = get(2)
+    if r == nil or r == 2 then fail("pools: blacklisted item not replaced, got " .. tostring(r)) end
+    pools.black, pools.white = {}, { 3 }
+    if get(1) ~= 3 then fail("pools: whitelist not applied") end
+    pools.white, pools.replace = {}, { { 1, 3 } }
+    if get(1) ~= 3 then fail("pools: replacement not applied") end
+    pools.replace, pools.qmin = {}, 2
+    if get(1) ~= 3 then fail("pools: quality filter not applied") end
+    pools.qmin, pools.qmax = 3, 4
+    if get(1) ~= nil then fail("pools: impossible filter should keep the item") end
+    pools.qmin, pools.qmax = 0, 4
+end
+
+-- Formations and targets: a clone in circle formation, labels and lists round-trip.
+do
+    local E = AC.rules
+    E.setLabel(npc, "boss", true)
+    if not E.hasLabel(npc, "boss") then fail("labels: set/has") end
+    E.addToList("group", npc)
+    E.addToList("group", npc)
+    if #E.listEntities("group") ~= 1 then fail("lists: duplicate add") end
+    if not E.matchFilter({ mode = "label", name = "boss" }, npc) then fail("filter: label") end
+    if not E.matchFilter({ mode = "list", name = "group" }, npc) then fail("filter: list") end
+    E.removeFromList("group", npc)
+    if E.inList("group", npc) then fail("lists: remove") end
+    local ctx = { player = player, entity = npc }
+    E.runAction({ id = "stop", p = { chance = 100 } }, ctx, { id = 1 })
+    if not ctx.stop then fail("stop action did not stop the chain") end
+end
 
 AC.registry.resetAll()
 fire("MC_POST_UPDATE")
