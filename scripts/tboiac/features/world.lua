@@ -25,6 +25,7 @@ end
 
 feature.pages = {
     world = {
+        layout = "tiles",
         title = function() return t("m_world") end,
         build = function()
             return {

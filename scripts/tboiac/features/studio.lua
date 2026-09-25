@@ -258,6 +258,7 @@ end
 
 feature.pages = {
     studio = {
+        layout = "tiles",
         title = function() return t("m_studio") end,
         build = function()
             return {

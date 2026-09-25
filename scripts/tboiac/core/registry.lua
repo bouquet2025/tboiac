@@ -54,6 +54,8 @@ function registry.start()
         AC.imgui.update()
     end)
     mod:AddCallback(ModCallbacks.MC_INPUT_ACTION, AC.input.onInputAction)
+    -- menu actions run here, in the game tick, never inside the render callback
+    mod:AddCallback(ModCallbacks.MC_POST_UPDATE, function() AC.menu.runQueue() end)
     mod:AddCallback(ModCallbacks.MC_POST_GAME_STARTED, function() AC.save.load() end)
     mod:AddCallback(ModCallbacks.MC_PRE_GAME_EXIT, function()
         if AC.menu.open then AC.menu.setOpen(false) end

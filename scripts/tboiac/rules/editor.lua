@@ -113,6 +113,96 @@ local FILTER_MODES = {
 
 local SCOPES = { { "scope_always", "always" }, { "scope_run", "run" }, { "scope_chapter", "chapter" } }
 
+-- Rule diagram (side panel) ------------------------------------------------------------------------
+
+local function paramSummary(def, p)
+    local parts = {}
+    for _, spec in ipairs(def.params or {}) do
+        local v = p and p[spec.key]
+        if v ~= nil and spec.kind ~= "toggle" then
+            if spec.kind == "choice" then
+                for _, o in ipairs(options(spec)) do if o[2] == v then v = o[1] end end
+            elseif spec.kind == "catalog" then
+                v = (v == 0 and spec.zero) and t(spec.zero) or (util.catalogs[spec.catalog].name(v) or v)
+            end
+            parts[#parts + 1] = tostring(v)
+        end
+        if #parts >= 3 then break end
+    end
+    return table.concat(parts, ", ")
+end
+
+local BLOCKS = {
+    when = { 0.35, 0.6, 1 }, ["if"] = { 1, 0.8, 0.3 }, ["then"] = { 0.4, 1, 0.5 },
+}
+
+-- Draws WHEN -> IF -> THEN boxes for a rule at (x, y), `w` wide. Returns the height used.
+local function drawRuleDiagram(rule, x, y, w)
+    local lh = AC.render.lineHeight() * 0.85
+    local y0 = y
+    local function block(kind, title, lines)
+        local c = BLOCKS[kind]
+        local h = lh + 4 + math.max(1, #lines) * lh + 4
+        AC.render.rect(x, y, w, h, { c[1], c[2], c[3], 0.12 })
+        AC.menu.border(x, y, w, h, { c[1], c[2], c[3], 0.7 })
+        AC.render.rect(x, y, w, lh + 3, { c[1], c[2], c[3], 0.3 })
+        AC.render.text(title, x + 4, y + 1, { c[1], c[2], c[3], 1 }, 0.85)
+        local ly = y + lh + 5
+        if #lines == 0 then
+            AC.render.text(t("diagram_none"), x + 4, ly, { 0.6, 0.6, 0.65, 1 }, 0.85)
+        end
+        for _, line in ipairs(lines) do
+            AC.render.text(AC.menu.fit(line, w - 8, 0.85), x + 4, ly, { 1, 1, 1, 1 }, 0.85)
+            ly = ly + lh
+        end
+        y = y + h
+    end
+    local function arrow()
+        AC.render.text("v", x + w / 2 - 3, y, { 0.8, 0.8, 0.85, 1 }, 0.85)
+        y = y + lh
+    end
+    local ev = engine.events[rule.event.id]
+    local whenLines = {}
+    if ev then
+        whenLines[1] = t(ev.label)
+        local sum = paramSummary(ev, rule.event.p)
+        if sum ~= "" then whenLines[#whenLines + 1] = sum end
+        if ev.entity and rule.filter and rule.filter.mode ~= "any" then
+            whenLines[#whenLines + 1] = t("filter") .. ": " .. t("f_" .. rule.filter.mode)
+        end
+    end
+    if rule.scope ~= "always" then whenLines[#whenLines + 1] = t("scope_" .. rule.scope) end
+    block("when", t("when"), whenLines)
+    arrow()
+    local ifLines = {}
+    for i, c in ipairs(rule.conds or {}) do
+        if i > 5 then ifLines[#ifLines + 1] = "+" .. (#rule.conds - 5) break end
+        local def = engine.conditions[c.id]
+        local line = (c.neg and (t("not") .. " ") or "") .. (def and t(def.label) or c.id)
+        local sum = def and paramSummary(def, c.p) or ""
+        if sum ~= "" then line = line .. ": " .. sum end
+        ifLines[#ifLines + 1] = line
+    end
+    local logic = #ifLines > 1 and (" (" .. t(rule.logic == "or" and "logic_or" or "logic_and") .. ")") or ""
+    block("if", t("if") .. logic, ifLines)
+    arrow()
+    local thenLines = {}
+    for i, a in ipairs(rule.acts or {}) do
+        if i > 6 then thenLines[#thenLines + 1] = "+" .. (#rule.acts - 6) break end
+        local def = engine.actions[a.id]
+        local line = i .. ". " .. (def and t(def.label) or a.id)
+        if (a.delay or 0) > 0 then line = line .. string.format(" (+%gs)", a.delay) end
+        thenLines[#thenLines + 1] = line
+    end
+    block("then", t("then"), thenLines)
+    if not rule.enabled then
+        AC.render.text(t("rule_disabled"), x, y + 2, { 1, 0.45, 0.45, 1 }, 0.85)
+        y = y + lh + 2
+    end
+    return y - y0
+end
+feature.drawRuleDiagram = drawRuleDiagram
+
 -- Pages ----------------------------------------------------------------------------------------
 
 local rulePage, conditionPage, actionPage
@@ -195,6 +285,7 @@ rulePage = function(rule)
     local confirmDelete = false
     return {
         title = function() return "#" .. rule.id .. " " .. rule.name end,
+        side = function(x, y, w) return drawRuleDiagram(rule, x, y, w) end,
         build = function()
             local ev = engine.events[rule.event.id]
             local items = {
@@ -320,7 +411,10 @@ feature.pages = {
                 menu.info(t("my_rules", #S.list)),
             }
             for _, rule in ipairs(S.list) do
-                items[#items + 1] = menu.link(ruleLabel(rule), function() return rulePage(rule) end)
+                local link = menu.link(ruleLabel(rule), function() return rulePage(rule) end)
+                link.side = function(x, y, w) return drawRuleDiagram(rule, x, y, w) end
+                link.icon = rule.enabled and 33 or nil
+                items[#items + 1] = link
             end
             if #S.list > 0 then
                 items[#items + 1] = menu.action(confirmClear and t("confirm_delete") or t("delete_all_rules"), function()

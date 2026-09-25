@@ -83,6 +83,8 @@ local keyboard = { KEY_SPACE = 32, KEY_APOSTROPHE = 39, KEY_MINUS = 45, KEY_PERI
 for i = 1, 12 do keyboard["KEY_F" .. i] = 289 + i end
 for c = 65, 90 do keyboard["KEY_" .. string.char(c)] = c end
 keyboard.KEY_TAB = 258
+keyboard.KEY_COMMA, keyboard.KEY_SEMICOLON, keyboard.KEY_LEFT_BRACKET, keyboard.KEY_RIGHT_BRACKET = 44, 59, 91, 93
+keyboard.KEY_LEFT_CONTROL, keyboard.KEY_LEFT_ALT, keyboard.KEY_RIGHT_CONTROL, keyboard.KEY_RIGHT_ALT = 341, 342, 345, 346
 for d = 0, 9 do keyboard["KEY_" .. d] = 48 + d; keyboard["KEY_KP_" .. d] = 320 + d end
 Keyboard = enum("Keyboard", keyboard)
 Controller = enum("Controller", { DPAD_LEFT = 0, DPAD_RIGHT = 1, DPAD_UP = 2, DPAD_DOWN = 3,
@@ -111,9 +113,10 @@ CacheFlag = enum("CacheFlag", { CACHE_DAMAGE = 1, CACHE_FIREDELAY = 2, CACHE_SHO
 ActiveSlot = enum("ActiveSlot", { SLOT_PRIMARY = 0, SLOT_SECONDARY = 1, SLOT_POCKET = 2 })
 PickupVariant = enum("PickupVariant", { PICKUP_COLLECTIBLE = 100, PICKUP_TRINKET = 350, PICKUP_TAROTCARD = 300 })
 CollectibleType = enum("CollectibleType", { COLLECTIBLE_D6 = 105, COLLECTIBLE_D4 = 284, COLLECTIBLE_D20 = 166,
-    COLLECTIBLE_SMELTER = 479, COLLECTIBLE_PAUSE = 478 })
+    COLLECTIBLE_SMELTER = 479, COLLECTIBLE_PAUSE = 478, COLLECTIBLE_BREAKFAST = 25 })
 UseFlag = enum("UseFlag", { USE_NOANIM = 1 })
-ItemPoolType = enum("ItemPoolType", { POOL_TREASURE = 0 })
+ItemPoolType = enum("ItemPoolType", { POOL_TREASURE = 0, POOL_SHOP = 1, POOL_BOSS = 2, POOL_DEVIL = 3,
+    POOL_ANGEL = 4, POOL_SECRET = 5, POOL_CURSE = 12 })
 PillColor = enum("PillColor", { PILL_BLUE_BLUE = 1 })
 RoomType = enum("RoomType", { ROOM_DEFAULT = 1, ROOM_SHOP = 2, ROOM_ERROR = 3, ROOM_TREASURE = 4,
     ROOM_BOSS = 5, ROOM_MINIBOSS = 6, ROOM_SECRET = 7, ROOM_SUPERSECRET = 8, ROOM_ARCADE = 9,
@@ -161,7 +164,8 @@ local npc = obj({
     HasEntityFlags = function() return false end, IsBoss = function() return false end,
     IsChampion = function() return false end, Exists = function() return true end,
     Color = { R = 1, G = 1, B = 1, A = 1, RO = 0, GO = 0, BO = 0 }, SpriteRotation = 0,
-    GetSprite = function() return obj({ IsPlaying = function() return true end }) end,
+    GetSprite = function() return obj({ IsPlaying = function() return true end,
+        GetFilename = function() return "gfx/test.anm2" end }) end,
     ToPickup = function() return nil end, Type = 10, Variant = 0, SubType = 0,
 })
 local pickup = obj({ Type = 5, Variant = 100, SubType = 3, Position = vec(0, 0), Velocity = vec(0, 0),
@@ -189,7 +193,8 @@ local room = obj({ GetGridSize = function() return 3 end, GetDoor = function(_, 
 local poolNext = 0
 local itemPool = obj({ GetCollectible = function() poolNext = poolNext % 3 + 1 return poolNext end })
 RNG = function() return obj({ Next = function() return 7 end, RandomInt = function(_, n) return 0 end }) end
-local game = obj({ GetItemPool = function() return itemPool end, GetNumPlayers = function() return 1 end, GetLevel = function() return level end,
+gamePaused = false
+local game = obj({ GetItemPool = function() return itemPool end, IsPaused = function() return gamePaused end, GetNumPlayers = function() return 1 end, GetLevel = function() return level end,
     GetRoom = function() return room end, GetSeeds = function() return obj({ GetStartSeedString = function() return "ABCD 1234" end }) end,
     TimeCounter = 0 })
 Game = function() return game end
@@ -199,7 +204,7 @@ local itemConfig = obj({
     GetCards = function() return list(3) end, GetPillEffects = function() return list(3) end,
     GetCollectible = function(_, id)
         if type(id) ~= "number" or id < 1 or id > 3 then return nil end
-        return { Name = id == 2 and "The Sad Onion" or "#ITEM_" .. id .. "_NAME", Quality = id - 1 }
+        return { Name = id == 2 and "The Sad Onion" or "#ITEM_" .. id .. "_NAME", Quality = id - 1, Type = 1 }
     end,
     GetTrinket = function(_, id) return { Name = "#TRINKET_" .. id .. "_NAME" } end,
     GetCard = function(_, id) return { Name = "#CARD_" .. id .. "_NAME" } end,
@@ -209,9 +214,12 @@ local itemConfig = obj({
 -- Input simulation: set of pressed keys for this frame.
 local pressed = {}
 clearAwards = 0
+mousePos, mouseButtons = vec(0, 0), {}
 Input = {
     IsButtonPressed = function(k) return pressed[k] == true end,
     IsButtonTriggered = function(k) return pressed[k] == true end,
+    GetMousePosition = function() return mousePos end,
+    IsMouseBtnPressed = function(b) return mouseButtons[b] == true end,
 }
 
 local debugLog = {}
@@ -299,6 +307,7 @@ local function frame(keys)
     pressed = {}
     for _, k in ipairs(keys or {}) do pressed[k] = true end
     fire("MC_POST_RENDER")
+    TBOIAC.menu.runQueue() -- menu actions run on the next game update
 end
 
 -- Error toasts from menu actions count as failures.
@@ -552,10 +561,98 @@ do
     Isaac.GetRoomEntities = real
 end
 
+-- v0.9: Esc keeps state, game pause, mouse, placing, Russian layout, discovery, Q/E.
+do
+    local M = AC.menu
+    AC.menu.setOpen(false)
+    M.stack = {}
+    frame({ Keyboard.KEY_F2 }); frame()
+    frame({ Keyboard.KEY_E }); frame()
+    if M.tab ~= 2 then fail("E did not switch to the next tab") end
+    frame({ Keyboard.KEY_Q }); frame()
+    if M.tab ~= 1 then fail("Q did not switch back") end
+    frame({ Keyboard.KEY_DOWN }); frame()
+    local cursor = M.top().cursor
+    frame({ Keyboard.KEY_ESCAPE }); frame()
+    if M.open then fail("Esc did not close the menu") end
+    frame({ Keyboard.KEY_F2 }); frame()
+    if not M.open or M.top().cursor ~= cursor then fail("menu did not reopen where it was") end
+    -- while the game's pause menu is open the mod menu ignores keys
+    gamePaused = true
+    frame({ Keyboard.KEY_DOWN }); frame()
+    gamePaused = false
+    if M.top().cursor ~= cursor then fail("menu moved while the game was paused") end
+    -- mouse: click the close button
+    frame()
+    local close
+    for _, h in ipairs(M.hits) do if h.w == 16 and h.click then close = h end end
+    if not close then fail("no close button hit region") else
+        mousePos = vec(close.x + 4, close.y + 4)
+        frame()
+        mouseButtons[0] = true; frame(); mouseButtons[0] = false; frame()
+        if M.open then fail("clicking X did not close the menu") end
+    end
+    -- mouse: hover + click a tile on the Quick tab opens it
+    AC.menu.setOpen(true)
+    M.stack = {}
+    AC.menu.setOpen(false)
+    AC.menu.setOpen(true)
+    frame()
+    local tileHit
+    for _, h in ipairs(M.hits) do if h.hover and h.rclick then tileHit = h break end end
+    if not tileHit then fail("no tile hit regions") else
+        mousePos = vec(tileHit.x + 2, tileHit.y + 2); frame()
+        mouseButtons[0] = true; frame(); mouseButtons[0] = false; frame()
+        if #M.stack < 2 then fail("clicking the first tile did not open its page") end
+    end
+    AC.menu.setOpen(false)
+    -- placing with the mouse from the item grid
+    local spawned = 0
+    local realSpawn = Isaac.Spawn
+    Isaac.Spawn = function(...) spawned = spawned + 1 return realSpawn(...) end
+    AC.menu.setOpen(true, "items_grid")
+    frame()
+    frame({ Keyboard.KEY_LEFT_CONTROL, Keyboard.KEY_ENTER }); frame()
+    if not M.place or M.open then fail("Ctrl+Enter did not start placing") end
+    mousePos = vec(50, 50)
+    mouseButtons[0] = true; frame(); mouseButtons[0] = false; frame()
+    if spawned < 1 then fail("placing did not spawn anything") end
+    mouseButtons[1] = true; frame(); mouseButtons[1] = false; frame()
+    if M.place or not M.open then fail("right click did not return to the menu") end
+    Isaac.Spawn = realSpawn
+    -- Russian layout in grid search: Alt+Shift toggles, Q types "й"
+    frame({ Keyboard.KEY_LEFT_ALT, Keyboard.KEY_LEFT_SHIFT }); frame()
+    if AC.input.layout ~= "ru" then fail("Alt+Shift did not switch to RU") end
+    frame({ Keyboard.KEY_Q }); frame()
+    if M.top().page.query ~= "й" then fail("RU layout typed '" .. M.top().page.query .. "'") end
+    AC.input.layout = "en"
+    M.top().page.query = ""
+    -- chips: move up to the filter bar and cycle the pool chip
+    M.top().focus = "chips"; M.top().chip = 3
+    frame({ Keyboard.KEY_ENTER }); frame()
+    if M.top().page.chipState.pool == nil then fail("pool chip did not change") end
+    M.top().page.chipState = {}
+    AC.menu.setOpen(false)
+    -- sprite discovery learns the anm2 of an entity and removes it
+    AC.save.data.iconCache["20.0"] = nil
+    AC.icons.tried = {}
+    AC.icons.discover({ { key = "20.0", t = 20, v = 0 } })
+    fire("MC_POST_UPDATE")
+    if AC.save.data.iconCache["20.0"] ~= "gfx/test.anm2" then fail("sprite discovery did not learn the anm2") end
+    -- a deferred pill action runs in the update, not while rendering
+    local ran = false
+    AC.menu.defer(function() ran = true end)
+    fire("MC_POST_RENDER")
+    if ran then fail("deferred action ran inside render") end
+    fire("MC_POST_UPDATE")
+    if not ran then fail("deferred action did not run on update") end
+end
+
 -- v0.8: tabs and icon grids.
 do
     local M = AC.menu
     AC.menu.setOpen(false)
+    M.stack, M.tab = {}, 1 -- fresh start (reopening normally returns to the last page)
     frame({ Keyboard.KEY_F2 }); frame()
     if M.stack[1].page.id ~= "quick" then fail("menu should open on the Quick tab") end
     frame({ Keyboard.KEY_TAB }); frame()

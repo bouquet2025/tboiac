@@ -57,10 +57,37 @@ local function withOptions(list)
     return items
 end
 
+local function spawnAt(etype, variant, pos, amount, champion, friendly)
+    local player = util.firstTarget()
+    for i = 1, amount do
+        local p = Isaac.GetFreeNearPosition(pos + Vector.FromAngle(i * 360 / amount) * (amount > 1 and 25 or 0), 20)
+        local e = Isaac.Spawn(etype, variant, 0, p, Vector.Zero, nil)
+        local npc = e and e:ToNPC()
+        if npc then
+            if champion and not npc:IsBoss() then npc:MakeChampion(Random(), -1, true) end
+            if friendly then
+                npc:AddCharmed(EntityRef(player), -1)
+                npc:AddEntityFlags(EntityFlag.FLAG_PERSISTENT)
+            end
+        end
+    end
+end
+
 local function entityGrid(titleKey, list, scale)
-    return AC.grid.page({
+    local page
+    page = AC.grid.page({
         title = function() return t(titleKey) end,
-        pickHint = "grid_spawn", altHint = "grid_friendly",
+        pickHint = "grid_spawn", altHint = "grid_friendly", amount = true,
+        chips = {
+            { id = "champion", label = "chip_champion", default = false,
+              options = { { "off", false }, { "on", true } } },
+        },
+        sorts = { { "sort_name", "name", AC.grid.byName } },
+        discover = function()
+            local jobs = {}
+            for _, b in ipairs(list) do jobs[#jobs + 1] = { key = b[2] .. "." .. b[3], t = b[2], v = b[3] } end
+            AC.icons.discover(jobs)
+        end,
         entries = function()
             local out = {}
             for _, b in ipairs(list) do
@@ -68,18 +95,29 @@ local function entityGrid(titleKey, list, scale)
                 local name = util.entityName(b[2], b[3], b[1])
                 out[#out + 1] = { name = name, id = key,
                     icon = function(pos) return AC.icons.entityKey(key, b[2], b[3], pos + Vector(0, 11), scale) end,
-                    pick = function(friendly) spawn(b[2], b[3], 0, name, friendly) end }
+                    pick = function(friendly, amount)
+                        local n, c = state.count, state.champion
+                        state.count = amount or 1
+                        state.champion = page.chipState.champion == true or c
+                        spawn(b[2], b[3], 0, name, friendly)
+                        state.count, state.champion = n, c
+                    end,
+                    place = function(pos, amount)
+                        spawnAt(b[2], b[3], pos, amount or 1, page.chipState.champion == true, false)
+                    end }
             end
             return out
         end,
         extra = spawnOptions,
     })
+    return page
 end
 
 feature.pages = {
     boss_grid = entityGrid("m_bosses", AC.data.BOSSES, 0.5),
     enemy_grid = entityGrid("m_enemies_common", AC.data.ENEMIES, 0.75),
     enemies = {
+        layout = "tiles",
         title = function() return t("m_enemies") end,
         build = function()
             return withOptions({

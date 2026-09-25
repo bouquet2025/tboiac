@@ -34,6 +34,7 @@ function icons.collectible(id, pos, scale)
     end)
     if not s then return false end
     s.Scale = Vector(scale or 1, scale or 1)
+    s.Color = Color(1, 1, 1, 1)
     s:Render(pos)
     return true
 end
@@ -45,6 +46,7 @@ function icons.trinket(id, pos, scale)
     end)
     if not s then return false end
     s.Scale = Vector(scale or 1, scale or 1)
+    s.Color = Color(1, 1, 1, 1)
     s:Render(pos)
     return true
 end
@@ -88,6 +90,35 @@ function icons.entity(etype, variant, pos, scale)
     return icons.entityKey(etype .. "." .. variant, etype, variant, pos + Vector(20, 30), scale or 0.75)
 end
 
+-- Generic icon drawing. `spec` is a collectible id (number), { trinket = id },
+-- { entity = "type.variant", t = type, v = variant } or a function(pos, scale) -> bool.
+function icons.draw(spec, pos, scale, alpha)
+    if spec == nil then return false end
+    if type(spec) == "function" then
+        local ok, res = pcall(spec, pos, scale)
+        return ok and res ~= false
+    end
+    local s
+    if type(spec) == "number" then
+        s = cached("c" .. spec, function()
+            local cfg = Isaac.GetItemConfig():GetCollectible(spec)
+            return cfg and pngSprite(cfg.GfxFileName)
+        end)
+    elseif spec.trinket then
+        s = cached("t" .. spec.trinket, function()
+            local cfg = Isaac.GetItemConfig():GetTrinket(spec.trinket)
+            return cfg and pngSprite(cfg.GfxFileName)
+        end)
+    elseif spec.entity then
+        return icons.entityKey(spec.entity, spec.t, spec.v, pos, scale)
+    end
+    if not s then return false end
+    s.Scale = Vector(scale or 1, scale or 1)
+    s.Color = Color(1, 1, 1, alpha or 1)
+    s:Render(pos)
+    return true
+end
+
 -- Learning ------------------------------------------------------------------------------------
 
 local function learn(key, entity)
@@ -100,7 +131,44 @@ local function learn(key, entity)
     end
 end
 
+-- Active sprite discovery (vanilla game): spawn each unknown entity far outside the room for a
+-- single frame, read its anm2 and remove it together with anything it created. One per update.
+-- Entities that need their own room/scripted fight are never spawned this way.
+local UNSAFE = { [274] = true, [275] = true, [406] = true, [407] = true, [412] = true, [912] = true,
+    [950] = true, [951] = true }
+icons.queue, icons.tried = {}, {}
+
+function icons.discover(list)
+    if AC.hasRepentogon then return end
+    for _, job in ipairs(list) do
+        if not AC.save.data.iconCache[job.key] and not icons.tried[job.key] and not UNSAFE[job.t] then
+            icons.tried[job.key] = true
+            icons.queue[#icons.queue + 1] = job
+        end
+    end
+end
+
+function icons.pending() return #icons.queue end
+
+local function discoverOne(job)
+    local before = {}
+    for _, e in ipairs(Isaac.GetRoomEntities()) do before[GetPtrHash(e)] = true end
+    local e = Isaac.Spawn(job.t, job.v, job.s or 0, Vector(-3000, -3000), Vector.Zero, nil)
+    if e then learn(job.key, e) end
+    for _, x in ipairs(Isaac.GetRoomEntities()) do
+        if not before[GetPtrHash(x)] then x:Remove() end
+    end
+end
+
 icons.callbacks = {
+    { ModCallbacks.MC_POST_UPDATE, function()
+        local job = table.remove(icons.queue, 1)
+        if job then
+            local ok, err = pcall(discoverOne, job)
+            if not ok then AC.util.log("sprite discovery failed for " .. job.key .. ": " .. tostring(err)) end
+        end
+    end },
+
     { ModCallbacks.MC_NPC_UPDATE, function(_, npc)
         local data = npc:GetData()
         if data.tboiacIcon then return end

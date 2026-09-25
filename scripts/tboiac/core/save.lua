@@ -6,9 +6,9 @@ local util = AC.util
 local save = {}
 
 save.defaults = {
-    ui = { lang = "ru", scale = 1, alpha = 0.8, x = 16, y = 14, pauseWorld = false,
+    ui = { lang = "ru", scale = 1, alpha = 0.88, offX = 0, offY = 0, pauseWorld = false,
            imgui = true, gameNames = true, -- these two only matter with REPENTOGON
-           layout = 2 }, -- bumped when the menu layout changes; older saves get the new position
+           layout = 3 }, -- bumped when the menu layout changes; older saves get the new position
     keys = { open = Keyboard.KEY_F2 },
     player = {
         target = 0,
@@ -71,7 +71,7 @@ function save.load()
         local layout = type(data.ui) == "table" and data.ui.layout
         save.data = util.merge(data, save.defaults)
         if layout ~= save.defaults.ui.layout then
-            save.data.ui.x, save.data.ui.y = save.defaults.ui.x, save.defaults.ui.y
+            save.data.ui.offX, save.data.ui.offY = 0, 0 -- centred
             save.data.ui.layout = save.defaults.ui.layout
         end
     else
