@@ -132,9 +132,8 @@ def({ id = "clear_costumes", label = "a_clear_costumes",
 def({ id = "hud", label = "a_hud",
     params = { P.choice("mode", "mode", "hide", { { "hud_hide", "hide" }, { "hud_show", "show" }, { "toggle", "toggle" } }) },
     run = function(p)
-        local hud = AC.game:GetHUD()
-        local v = p.mode == "show" or (p.mode == "toggle" and not hud:IsVisible())
-        hud:SetVisible(v)
+        local v = p.mode == "show" or (p.mode == "toggle" and not AC.menu.hudVisible())
+        AC.menu.setHudVisible(v)
     end })
 
 -- Doors -----------------------------------------------------------------------------------------

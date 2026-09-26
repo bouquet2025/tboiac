@@ -40,7 +40,7 @@ end
 
 local function setClean(v)
     S().clean = v
-    AC.game:GetHUD():SetVisible(not v)
+    AC.menu.setHudVisible(not v)
     if v and AC.menu.open then AC.menu.setOpen(false) end
 end
 
@@ -61,8 +61,8 @@ local OPTIONS = {
                            function(v) AC.save.data.time.freezeProjectiles = v end },
     slow_motion = { function() return AC.save.data.time.mode == 1 end,
                     function(v) AC.save.data.time.mode = v and 1 or 0 end },
-    hide_hud = { function() return not AC.game:GetHUD():IsVisible() end,
-                 function(v) AC.game:GetHUD():SetVisible(not v) end },
+    hide_hud = { function() return not AC.menu.hudVisible() end,
+                 function(v) AC.menu.setHudVisible(not v) end },
     clean_frame = { function() return S().clean end, setClean },
     pools_enabled = { function() return AC.save.data.pools.enabled end, function(v) AC.save.data.pools.enabled = v end },
     drops_enabled = { function() return AC.save.data.drops.enabled end, function(v) AC.save.data.drops.enabled = v end },
@@ -127,7 +127,7 @@ function feature.loadProfile(profile)
     end
     engine.queue = {}
     recache()
-    AC.game:GetHUD():SetVisible(not S().clean)
+    AC.menu.setHudVisible(not S().clean)
     AC.save.write()
     AC.render.toast(t("profile_loaded", profile.name))
 end
@@ -354,7 +354,7 @@ feature.pages = {
                     if k ~= "rules" then AC.save.data[k] = util.copy(AC.save.defaults[k]) end
                 end
                 recache()
-                AC.game:GetHUD():SetVisible(true)
+                AC.menu.setHudVisible(true)
                 AC.render.toast(t("factory_done"))
             end)
             return items

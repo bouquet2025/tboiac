@@ -206,6 +206,32 @@ function menu.setOpen(v, pageId)
     end
 end
 
+-- HUD ---------------------------------------------------------------------------------------------
+-- The vanilla HUD is drawn on top of MC_POST_RENDER, so it would cover the menu. While the menu is
+-- open the HUD is hidden and the user's own "hide HUD" choice is kept in `hudWanted` instead.
+
+local hudWanted = nil -- nil = menu is not hiding the HUD
+
+function menu.hudVisible()
+    if hudWanted ~= nil then return hudWanted end
+    return AC.game:GetHUD():IsVisible()
+end
+
+function menu.setHudVisible(v)
+    if hudWanted ~= nil then hudWanted = v else AC.game:GetHUD():SetVisible(v) end
+end
+
+local function syncHud()
+    if menu.open and hudWanted == nil then
+        local hud = AC.game:GetHUD()
+        hudWanted = hud:IsVisible()
+        hud:SetVisible(false)
+    elseif not menu.open and hudWanted ~= nil then
+        AC.game:GetHUD():SetVisible(hudWanted)
+        hudWanted = nil
+    end
+end
+
 -- Deferred execution ------------------------------------------------------------------------------
 
 local function safe(fn, ...)
@@ -522,6 +548,16 @@ local function border(x, y, w, h, color)
 end
 menu.border = border
 
+-- Lines drawDesc uses for `text` (at most 3).
+local function descLineCount(text, width)
+    if type(text) ~= "string" or text == "" then return 0 end
+    return math.min(3, #AC.render.wrap(text, width, 0.9))
+end
+
+local function itemDesc(item)
+    return item.desc or AC.i18n.desc(resolve(item.label))
+end
+
 local function drawDesc(text, x, y, width, lh)
     if not text or text == "" then return y end
     for i, line in ipairs(AC.render.wrap(text, width, 0.9)) do
@@ -811,8 +847,11 @@ local function drawGrid(frame, x, y, width, lh)
         y = y + lh
         local desc = e.desc
         if type(desc) == "function" then desc = desc() end
-        if desc then y = drawDesc(desc, x, y, width, lh) end
+        drawDesc(desc, x, y, width, lh)
+        frame.descLines = math.max(frame.descLines or 2, descLineCount(desc, width))
     end
+    -- fixed-height description area, so the panel does not jump between entries
+    y = y + (frame.descLines or 2) * lh * 0.9
     local buttons = { { t(page.gridDef.pickHint or "grid_pick"), function() gridPick(frame, false) end } }
     if page.gridDef.altHint then
         buttons[#buttons + 1] = { t(page.gridDef.altHint), function() gridPick(frame, true) end }
@@ -856,6 +895,7 @@ end
 
 function menu.draw()
     menu.hits = {}
+    syncHud()
     if AC.game:IsPaused() then return end
     if menu.place then
         drawPlace()
@@ -870,9 +910,20 @@ function menu.draw()
     local width = PANEL_W
     local item = frame.items[frame.cursor]
     local side = frame.page.side or (item and item.side)
-    local sideW = side and 150 or 0
+    -- Reserve room for the longest description and for the side panel once per page, so the
+    -- panel keeps its size and position while the cursor moves.
+    if not frame.page.grid and not frame.descLines then
+        local n = 0
+        for _, it in ipairs(frame.items) do
+            if it.side then frame.hasSide = true end
+            n = math.max(n, descLineCount(itemDesc(it), width))
+        end
+        frame.descLines = n
+    end
+    local reserveSide = side or frame.hasSide
+    local sideW = reserveSide and 150 or 0
     local height = frame.drawnHeight or (lh * 14)
-    local x = math.floor((sw - width - (side and sideW + 14 or 0)) / 2 + (ui.offX or 0))
+    local x = math.floor((sw - width - (reserveSide and sideW + 14 or 0)) / 2 + (ui.offX or 0))
     local y = math.floor((sh - height) / 2 + (ui.offY or 0))
     x = AC.util.clamp(x, 10, math.max(10, sw - width - 10))
     y = AC.util.clamp(y, 8, math.max(8, sh - height - 4))
@@ -904,12 +955,12 @@ function menu.draw()
             y = drawList(frame, x, y, width, lh)
         end
         local sel = frame.items[frame.cursor]
-        if sel then
-            local desc = sel.desc or AC.i18n.desc(resolve(sel.label))
-            if desc then
-                AC.render.rect(x - 4, y + 2, width + 8, 1, COLORS.border)
-                y = drawDesc(desc, x, y + 5, width, lh)
-            end
+        local desc = sel and itemDesc(sel)
+        frame.descLines = math.max(frame.descLines, descLineCount(desc, width))
+        if frame.descLines > 0 then
+            AC.render.rect(x - 4, y + 2, width + 8, 1, COLORS.border)
+            drawDesc(desc, x, y + 5, width, lh)
+            y = y + 5 + frame.descLines * lh * 0.9
         end
         local hint = AC.input.textTarget and t("hint_text") or t("hint_nav")
         AC.render.text(hint, x, y + 2, COLORS.hint, 0.85)

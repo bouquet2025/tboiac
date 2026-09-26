@@ -40,8 +40,8 @@ feature.pages = {
                 menu.link(t("m_seeds"), "world_seeds"),
                 menu.link(t("m_music"), "world_music"),
                 { kind = "toggle", label = t("hide_hud"),
-                  get = function() return not AC.game:GetHUD():IsVisible() end,
-                  set = function(v) AC.game:GetHUD():SetVisible(not v) end },
+                  get = function() return not AC.menu.hudVisible() end,
+                  set = function(v) AC.menu.setHudVisible(not v) end },
                 menu.action(t("reveal_map"), function()
                     local level = AC.game:GetLevel()
                     level:ApplyMapEffect()
