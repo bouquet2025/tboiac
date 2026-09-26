@@ -28,6 +28,22 @@ end
 
 local CHARACTERS = AC.data.CHARACTERS
 
+-- The game does not always reset SpriteScale before CACHE_SIZE, so remember the factor we applied
+-- and the scale we left: if the scale is still ours, take the old factor off before the new one.
+local function applySize(player, size)
+    local data = player:GetData()
+    local scale = player.SpriteScale
+    local last = data.tboiacSize
+    if last and data.tboiacScale and math.abs(scale.X - data.tboiacScale.X) < 0.001
+        and math.abs(scale.Y - data.tboiacScale.Y) < 0.001 then
+        scale = scale / last
+    end
+    if size == 1 and not last then return end
+    player.SpriteScale = scale * size
+    data.tboiacSize = size ~= 1 and size or nil
+    data.tboiacScale = size ~= 1 and Vector(player.SpriteScale.X, player.SpriteScale.Y) or nil
+end
+
 local HEARTS = {
     { "h_container", function(p, n) p:AddMaxHearts(2 * n) end },
     { "h_red", function(p, n) p:AddHearts(2 * n) end },
@@ -184,8 +200,8 @@ local function onCache(_, player, flag)
         player.Luck = player.Luck + st.luck
     elseif flag == CacheFlag.CACHE_FLYING and S().flight then
         player.CanFly = true
-    elseif flag == CacheFlag.CACHE_SIZE and S().size ~= 1 then
-        player.SpriteScale = player.SpriteScale * S().size
+    elseif flag == CacheFlag.CACHE_SIZE then
+        applySize(player, S().size)
     end
 end
 
