@@ -7,6 +7,8 @@ return {
     hint_text = "Type text  Enter: done  Backspace: erase",
     panic = "!! Reset all modifiers !!", panic_done = "All modifiers reset",
     m_recent = "Recent",
+    group_toggles = "-- Toggles --", group_browse = "-- Browse --", group_manage = "-- Manage --",
+    group_actions = "-- Quick actions --",
 
     -- player
     m_player = "Player", target = "Target", target_all = "All players",

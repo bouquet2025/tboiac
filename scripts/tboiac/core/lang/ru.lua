@@ -7,6 +7,8 @@ return {
     hint_text = "Введите текст  Enter: готово  Backspace: стереть",
     panic = "!! Сбросить все модификаторы !!", panic_done = "Все модификаторы сброшены",
     m_recent = "Недавние",
+    group_toggles = "-- Переключатели --", group_browse = "-- Обзор --", group_manage = "-- Управление --",
+    group_actions = "-- Быстрые действия --",
 
     -- игрок
     m_player = "Игрок", target = "Цель", target_all = "Все игроки",

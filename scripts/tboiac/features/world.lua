@@ -29,6 +29,7 @@ feature.pages = {
         title = function() return t("m_world") end,
         build = function()
             return {
+                menu.info(t("group_browse")),
                 menu.link(t("m_teleport"), "world_teleport"),
                 menu.link(t("m_time"), "time"),
                 menu.link(t("m_rooms"), "world_rooms"),
@@ -39,6 +40,7 @@ feature.pages = {
                 menu.link(t("m_console"), "world_console"),
                 menu.link(t("m_seeds"), "world_seeds"),
                 menu.link(t("m_music"), "world_music"),
+                menu.info(t("group_actions")),
                 { kind = "toggle", label = t("hide_hud"),
                   get = function() return not AC.game:GetHUD():IsVisible() end,
                   set = function(v) AC.game:GetHUD():SetVisible(not v) end },

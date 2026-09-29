@@ -52,7 +52,8 @@ local function spawnOptions()
 end
 
 local function withOptions(list)
-    local items = spawnOptions()
+    local items = { menu.info(t("group_toggles")) }
+    for _, it in ipairs(spawnOptions()) do items[#items + 1] = it end
     for _, it in ipairs(list) do items[#items + 1] = it end
     return items
 end
@@ -121,6 +122,7 @@ feature.pages = {
         title = function() return t("m_enemies") end,
         build = function()
             return withOptions({
+                menu.info(t("group_browse")),
                 menu.link(t("m_bosses"), "boss_grid"),
                 menu.link(t("m_enemies_common"), "enemy_grid"),
                 menu.link(t("m_waves"), "waves"),
@@ -128,6 +130,7 @@ feature.pages = {
                 menu.link(t("m_recent"), "enemies_recent"),
                 menu.number(t("hp_mult"), "enemies", "hpMult", 0.1, 20, 0.1),
                 menu.toggle(t("all_champions"), "enemies", "allChampions"),
+                menu.info(t("group_actions")),
                 menu.action(t("kill_all"), forEnemies(function(npc) npc:Kill() end)),
                 menu.action(t("remove_all"), forEnemies(function(npc) npc:Remove() end)),
                 menu.action(t("champion_all"), forEnemies(function(npc)
