@@ -32,22 +32,22 @@ end
 
 local function entityPicker(spec, p)
     local function list(title, entries)
-        return {
+        return AC.catalog.page({
             title = function() return t(title) end,
-            build = function()
-                local items = {}
-                for _, e in ipairs(entries) do
-                    local it = menu.action(string.format("%s  %d.%d", util.entityName(e[2], e[3], e[1]), e[2], e[3]), function()
-                        p[spec.key] = e[2] .. "." .. e[3] .. ".0"
-                        menu.pop()
-                        menu.pop()
-                    end)
-                    it.icon = function(pos) AC.icons.entity(e[2], e[3], pos) end
-                    items[#items + 1] = it
-                end
-                return items
+            ids = function() return AC.catalog.range(1, #entries) end,
+            -- the real type.variant, not the array index catalog.page shows as "#id"
+            name = function(i)
+                local e = entries[i]
+                return e and string.format("%s  %d.%d", util.entityName(e[2], e[3], e[1]), e[2], e[3])
             end,
-        }
+            icon = function(i, pos) local e = entries[i]; if e then AC.icons.entity(e[2], e[3], pos) end end,
+            pick = function(i)
+                local e = entries[i]
+                p[spec.key] = e[2] .. "." .. e[3] .. ".0"
+                menu.pop()
+                menu.pop()
+            end,
+        })
     end
     return {
         title = function() return t(spec.label) end,

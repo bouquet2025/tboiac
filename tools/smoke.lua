@@ -980,6 +980,37 @@ do
     if not ctx.stop then fail("stop action did not stop the chain") end
 end
 
+-- rule editor's boss/enemy entity picker: now a searchable catalog.page (was an unsearched
+-- 86-entry list), so typing a query must filter it and picking must still set the real
+-- "type.variant.subtype" string, not the array index catalog.page uses as its own "#id".
+do
+    local M = AC.menu
+    M.setOpen(false)
+    M.stack = {}
+    local spec, p = { key = "ent" }, {}
+    M.push(AC.ruleEditor.entityPicker(spec, p))
+    local top = M.top()
+    local link
+    for _, it in ipairs(top.items) do if it.kind == "page" then link = it break end end
+    if not link then fail("entity picker: no link to the bosses list") end
+    M.push(link.page, link)
+    top = M.top()
+    local searchItem = top.items[1]
+    if searchItem.kind ~= "text" then fail("entity picker: first item is not the search box") end
+    searchItem.set("mom")
+    M.refresh()
+    top = M.top()
+    local found
+    for _, it in ipairs(top.items) do
+        if it.kind == "action" and it.label:lower():find("mom", 1, true) then found = it break end
+    end
+    if not found then fail("entity picker: searching 'mom' found nothing") end
+    if not found.icon then fail("entity picker: result has no icon") end
+    found.fn()
+    if p.ent ~= "45.0.0" then fail("entity picker: pick set p.ent = " .. tostring(p.ent)) end
+    M.setOpen(false)
+end
+
 AC.registry.resetAll()
 fire("MC_POST_UPDATE")
 fire("MC_PRE_GAME_EXIT", true)

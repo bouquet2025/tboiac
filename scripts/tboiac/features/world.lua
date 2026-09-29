@@ -8,6 +8,7 @@ local ROOM_TYPES, STAGES, CURSES = AC.data.ROOM_TYPES, AC.data.STAGES, AC.data.C
 local teleport, findRoom, roomTypeName = util.teleport, util.findRoom, util.roomTypeName
 
 local state = { command = "", layout = "" }
+local stageQuery = ""
 
 local function openDoors()
     local room = AC.game:GetRoom()
@@ -97,12 +98,19 @@ feature.pages = {
     world_stages = {
         title = function() return t("m_stages") end,
         build = function()
-            local items = { menu.info(t("console_warning")) }
+            local items = {
+                { kind = "text", label = t("search"), live = true,
+                  get = function() return stageQuery end, set = function(s) stageQuery = s end },
+                menu.info(t("console_warning")),
+            }
+            local q = AC.names.lower(stageQuery)
             for _, s in ipairs(STAGES) do
-                items[#items + 1] = menu.action(s[1], function()
-                    AC.menu.setOpen(false)
-                    util.command("stage " .. s[2] .. s[3])
-                end)
+                if q == "" or AC.names.lower(s[1]):find(q, 1, true) then
+                    items[#items + 1] = menu.action(s[1], function()
+                        AC.menu.setOpen(false)
+                        util.command("stage " .. s[2] .. s[3])
+                    end)
+                end
             end
             return items
         end,

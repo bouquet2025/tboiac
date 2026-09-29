@@ -7,7 +7,6 @@ local t = function(...) return AC.i18n.t(...) end
 local feature = { id = "enemies", label = "m_enemies" }
 
 local function S() return AC.save.data.enemies end
-local BOSSES = AC.data.BOSSES
 
 local state = { type = 10, variant = 0, subtype = 0, count = 1, champion = false }
 
@@ -141,36 +140,6 @@ feature.pages = {
                 end)),
                 menu.action(t("heal_all"), forEnemies(function(npc) npc.HitPoints = npc.MaxHitPoints end)),
             })
-        end,
-    },
-    enemies_bosses = {
-        title = function() return t("m_bosses") end,
-        build = function()
-            local items = spawnOptions()
-            for _, b in ipairs(BOSSES) do
-                local name = util.entityName(b[2], b[3], b[1])
-                local it = menu.action(string.format("%s  %d.%d", name, b[2], b[3]), function()
-                    spawn(b[2], b[3], 0, name)
-                end)
-                it.icon = function(pos) AC.icons.entity(b[2], b[3], pos) end
-                items[#items + 1] = it
-            end
-            return items
-        end,
-    },
-    enemies_common = {
-        title = function() return t("m_enemies_common") end,
-        build = function()
-            local items = spawnOptions()
-            for _, b in ipairs(AC.data.ENEMIES) do
-                local name = util.entityName(b[2], b[3], b[1])
-                local it = menu.action(string.format("%s  %d.%d", name, b[2], b[3]), function()
-                    spawn(b[2], b[3], 0, name)
-                end)
-                it.icon = function(pos) AC.icons.entity(b[2], b[3], pos) end
-                items[#items + 1] = it
-            end
-            return items
         end,
     },
     enemies_custom = {

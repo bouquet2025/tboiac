@@ -6,6 +6,7 @@ local t = function(...) return AC.i18n.t(...) end
 local feature = { id = "player", label = "m_player" }
 
 local function S() return AC.save.data.player end
+local charQuery = ""
 
 local function isTarget(player)
     local target = S().target
@@ -146,13 +147,19 @@ feature.pages = {
     player_character = {
         title = function() return t("m_character") end,
         build = function()
-            local items = {}
+            local items = {
+                { kind = "text", label = t("search"), live = true,
+                  get = function() return charQuery end, set = function(s) charQuery = s end },
+            }
+            local q = AC.names.lower(charQuery)
             for _, c in ipairs(CHARACTERS) do
                 local name = util.characterName(c[1], c[2])
-                items[#items + 1] = menu.action(name, each(function(p)
-                    p:ChangePlayerType(c[1])
-                    AC.render.toast(t("changed_to", name))
-                end))
+                if q == "" or AC.names.lower(name):find(q, 1, true) then
+                    items[#items + 1] = menu.action(name, each(function(p)
+                        p:ChangePlayerType(c[1])
+                        AC.render.toast(t("changed_to", name))
+                    end))
+                end
             end
             return items
         end,
