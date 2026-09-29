@@ -7,6 +7,7 @@ local feature = { id = "items", label = "m_items" }
 
 -- "inventory" adds directly, "pedestal" spawns on the floor.
 local mode = { give = "inventory" }
+local invQuery = ""
 
 local function modeChoice()
     return {
@@ -235,15 +236,28 @@ feature.pages = {
     items_inventory = {
         title = function() return t("m_inventory") end,
         build = function()
-            local items = { menu.info(t("inventory_hint")) }
+            local items = {
+                { kind = "text", label = t("search"), live = true,
+                  get = function() return invQuery end, set = function(s) invQuery = s end },
+                menu.info(t("inventory_hint")),
+            }
             local p = util.firstTarget()
+            local q = AC.names.lower(invQuery)
+            local qid = tonumber(q)
             for _, id in ipairs(ownedCollectibles()) do
                 local name = util.collectibleName(id)
-                local n = p:GetCollectibleNum(id, true)
-                items[#items + 1] = menu.action(string.format("%s x%d", name, n), function()
-                    p:RemoveCollectible(id)
-                    AC.render.toast(t("removed", name))
-                end)
+                local alias = util.collectibleAlias(id)
+                local lower = AC.names.lower(name)
+                if alias and alias ~= name then lower = lower .. "\n" .. AC.names.lower(alias) end
+                if q == "" or lower:find(q, 1, true) or id == qid then
+                    local n = p:GetCollectibleNum(id, true)
+                    local it = menu.action(string.format("%s x%d", name, n), function()
+                        p:RemoveCollectible(id)
+                        AC.render.toast(t("removed", name))
+                    end)
+                    it.icon = id
+                    items[#items + 1] = it
+                end
             end
             return items
         end,
