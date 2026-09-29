@@ -98,7 +98,9 @@ local function idListPage(key, title)
                 menu.info(t("pool_remove_hint")),
             }
             for i, id in ipairs(list) do
-                items[#items + 1] = menu.action(itemLabel(id), function() table.remove(list, i) end)
+                local it = menu.action(itemLabel(id), function() table.remove(list, i) end)
+                it.icon = id
+                items[#items + 1] = it
             end
             return items
         end,

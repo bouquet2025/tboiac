@@ -52,7 +52,7 @@ function catalog.page(def)
                         kind = "action",
                         label = string.format("%s  #%s", e.name, tostring(e.id)),
                         fn = function() def.pick(e.id, e.name) end,
-                        preview = def.icon and function(pos) def.icon(e.id, pos) end or nil,
+                        icon = def.icon and function(pos) def.icon(e.id, pos) end or nil,
                     }
                 end
             end

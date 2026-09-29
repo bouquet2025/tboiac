@@ -152,7 +152,7 @@ feature.pages = {
                 local it = menu.action(string.format("%s  %d.%d", name, b[2], b[3]), function()
                     spawn(b[2], b[3], 0, name)
                 end)
-                it.preview = function(pos) AC.icons.entity(b[2], b[3], pos) end
+                it.icon = function(pos) AC.icons.entity(b[2], b[3], pos) end
                 items[#items + 1] = it
             end
             return items
@@ -167,7 +167,7 @@ feature.pages = {
                 local it = menu.action(string.format("%s  %d.%d", name, b[2], b[3]), function()
                     spawn(b[2], b[3], 0, name)
                 end)
-                it.preview = function(pos) AC.icons.entity(b[2], b[3], pos) end
+                it.icon = function(pos) AC.icons.entity(b[2], b[3], pos) end
                 items[#items + 1] = it
             end
             return items
@@ -197,9 +197,13 @@ feature.pages = {
             for _, key in ipairs(AC.save.data.recent.entities) do
                 local a, b, c = key:match("^(%d+)%.(%d+)%.(%d+)$")
                 if a then
-                    items[#items + 1] = menu.action(key, function()
-                        spawn(tonumber(a), tonumber(b), tonumber(c), key)
+                    local etype, variant = tonumber(a), tonumber(b)
+                    local name = util.entityName(etype, variant, key)
+                    local it = menu.action(string.format("%s  %s", name, key), function()
+                        spawn(etype, variant, tonumber(c), key)
                     end)
+                    it.icon = function(pos) AC.icons.entity(etype, variant, pos) end
+                    items[#items + 1] = it
                 end
             end
             return items

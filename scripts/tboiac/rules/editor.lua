@@ -42,7 +42,7 @@ local function entityPicker(spec, p)
                         menu.pop()
                         menu.pop()
                     end)
-                    it.preview = function(pos) AC.icons.entity(e[2], e[3], pos) end
+                    it.icon = function(pos) AC.icons.entity(e[2], e[3], pos) end
                     items[#items + 1] = it
                 end
                 return items

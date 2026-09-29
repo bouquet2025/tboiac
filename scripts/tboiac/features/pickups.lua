@@ -147,7 +147,17 @@ for _, g in ipairs(GROUPS) do
         build = function()
             local items = { countItem() }
             for _, p in ipairs(g[2]) do
-                items[#items + 1] = menu.action(t(p[1]), function() spawn(p[2], p[3], t(p[1])) end)
+                local it = menu.action(t(p[1]), function() spawn(p[2], p[3], t(p[1])) end)
+                if p[2] ~= 0 then
+                    -- Same key/offset as pickups_grid's entries, scaled to whatever this row is
+                    -- drawn at (list rows pass 0.5, tiles pass 0.75).
+                    local key = "5." .. p[2] .. "." .. p[3]
+                    it.icon = function(pos, scale)
+                        scale = scale or 1
+                        return AC.icons.entityKey(key, 5, p[2], pos + Vector(0, 8 * scale), scale)
+                    end
+                end
+                items[#items + 1] = it
             end
             return items
         end,

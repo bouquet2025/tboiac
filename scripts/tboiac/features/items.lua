@@ -229,7 +229,7 @@ feature.pages = {
                 local name = util.collectibleName(id)
                 if name then
                     local it = menu.action(name .. "  #" .. id, function() giveCollectible(id, name) end)
-                    it.preview = function(pos) AC.icons.collectible(id, pos) end
+                    it.icon = function(pos) AC.icons.collectible(id, pos) end
                     items[#items + 1] = it
                 end
             end
