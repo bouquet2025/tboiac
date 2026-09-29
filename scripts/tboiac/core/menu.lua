@@ -441,6 +441,12 @@ function menu.update()
     end
 
     local ev = AC.input.poll()
+    -- Mouse wheel: another way to press up/down, so it reuses the same navigation logic
+    -- (grid row-jump, list cursor move, tile spatial move) instead of its own code path.
+    local wheel = AC.input.wheel()
+    if wheel ~= 0 then
+        if wheel > 0 then ev.up = true else ev.down = true end
+    end
     local tabNext, tabPrev = ev.tabNext, ev.tabPrev
     if not frame.page.grid then
         local e, q = AC.input.tabKeys()

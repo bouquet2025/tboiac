@@ -208,6 +208,7 @@ end
 -- Mouse in screen (render) coordinates, with click edges.
 local mouseLast, mouseMovedAt = nil, -1000
 local mouseDown = {}
+
 function input.mouse()
     local ok, world = pcall(Input.GetMousePosition, true)
     if not ok or not world then return nil end
@@ -226,6 +227,15 @@ function input.mouse()
         active = Isaac.GetFrameCount() - mouseMovedAt < 300, -- used recently: show the cursor
         left = edge(0), right = edge(1),
     }
+end
+
+-- Vertical mouse wheel delta this frame. REPENTOGON-only (Input.GetMouseWheel does not exist on
+-- vanilla Isaac); call at most once per frame (menu.update() only), since the underlying value
+-- may not survive being read twice in one frame.
+function input.wheel()
+    if not (AC.hasRepentogon and Input.GetMouseWheel) then return 0 end
+    local ok, v = pcall(Input.GetMouseWheel)
+    return (ok and v and v.Y) or 0
 end
 
 local END_KEYS = { Keyboard.KEY_ENTER, Keyboard.KEY_KP_ENTER, Keyboard.KEY_ESCAPE, Keyboard.KEY_BACKSPACE }

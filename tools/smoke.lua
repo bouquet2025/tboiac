@@ -214,12 +214,13 @@ local itemConfig = obj({
 -- Input simulation: set of pressed keys for this frame.
 local pressed = {}
 clearAwards = 0
-mousePos, mouseButtons = vec(0, 0), {}
+mousePos, mouseButtons, mouseWheel = vec(0, 0), {}, 0
 Input = {
     IsButtonPressed = function(k) return pressed[k] == true end,
     IsButtonTriggered = function(k) return pressed[k] == true end,
     GetMousePosition = function() return mousePos end,
     IsMouseBtnPressed = function(b) return mouseButtons[b] == true end,
+    GetMouseWheel = function() return vec(0, mouseWheel) end, -- REPENTOGON-only
 }
 
 local debugLog = {}
@@ -803,9 +804,42 @@ do
     explore(0)
     print("imgui: visited " .. visited .. " pages via " .. clicks .. " clicks")
     if clicks < 20 then fail("imgui: navigation did not work") end
+
+    -- mouse wheel (REPENTOGON-only: Input.GetMouseWheel) scrolls list and grid pages
+    do
+        local M = AC.menu
+        M.setOpen(true, "player_stats")
+        frame()
+        local top = M.top()
+        local start = top.cursor
+        mouseWheel = -1
+        frame()
+        if top.cursor ~= start + 1 then fail("wheel down did not move the list cursor") end
+        mouseWheel = 1
+        frame()
+        if top.cursor ~= start then fail("wheel up did not move the list cursor back") end
+        mouseWheel = 0
+        M.setOpen(false)
+
+        M.setOpen(true, "items_grid")
+        frame()
+        top = M.top()
+        local cols = top.cols or 8
+        top.sel = cols + 1 -- not in the first row, so wheel up moves the selection, not the chip focus
+        mouseWheel = 1
+        frame()
+        if top.sel ~= 1 then fail("wheel up did not jump a row on the grid, sel=" .. tostring(top.sel)) end
+        mouseWheel = 0
+        M.setOpen(false)
+    end
+
     AC.imgui.shutdown()
     if elements.tboiacWindow or elements.tboiacMenu then fail("imgui: shutdown left the window") end
+    -- outside REPENTOGON, the wheel must be a no-op rather than error
+    mouseWheel = 1
     AC.hasRepentogon = false
+    if AC.input.wheel() ~= 0 then fail("wheel: non-zero outside REPENTOGON") end
+    mouseWheel = 0
     Isaac.GetString = nil
 end
 
