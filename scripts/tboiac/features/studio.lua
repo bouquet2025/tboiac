@@ -218,7 +218,7 @@ local function drawOverlay()
 end
 
 local function onRender()
-    if AC.input.keyEdge(S().cleanKey) and not AC.input.textTarget and not AC.imgui.active() then
+    if AC.input.keyEdge(S().cleanKey) and not AC.menu.open and not AC.input.textTarget and not AC.imgui.active() then
         setClean(not S().clean)
     end
     drawOverlay()

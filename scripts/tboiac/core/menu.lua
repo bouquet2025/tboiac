@@ -872,8 +872,12 @@ function menu.draw()
     local side = frame.page.side or (item and item.side)
     local sideW = side and 150 or 0
     local height = frame.drawnHeight or (lh * 14)
+    -- Smooth the height used to vertically centre the panel: with the raw height, typing a
+    -- search query that adds/removes rows snaps the whole panel up or down every keystroke.
+    -- The box itself is always drawn at the real (unsmoothed) height so content never clips.
+    frame.smoothH = frame.smoothH and (frame.smoothH + (height - frame.smoothH) * 0.35) or height
     local x = math.floor((sw - width - (side and sideW + 14 or 0)) / 2 + (ui.offX or 0))
-    local y = math.floor((sh - height) / 2 + (ui.offY or 0))
+    local y = math.floor((sh - frame.smoothH) / 2 + (ui.offY or 0))
     x = AC.util.clamp(x, 10, math.max(10, sw - width - 10))
     y = AC.util.clamp(y, 8, math.max(8, sh - height - 4))
 

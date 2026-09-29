@@ -151,6 +151,11 @@ end
 local TEXT_KEYS = {} -- every physical key used by either layout
 for k in pairs(TEXT_EN) do TEXT_KEYS[k] = true end
 for k in pairs(TEXT_RU) do TEXT_KEYS[k] = true end
+-- Iterated in a fixed order (not pairs()'s hash order) so that two keys triggered on the same
+-- frame always end up in the same, predictable order instead of shuffling on every keystroke.
+local TEXT_KEY_LIST = {}
+for k in pairs(TEXT_KEYS) do TEXT_KEY_LIST[#TEXT_KEY_LIST + 1] = k end
+table.sort(TEXT_KEY_LIST)
 
 function input.toggleLayout()
     input.layout = input.layout == "en" and "ru" or "en"
@@ -176,13 +181,20 @@ end
 function input.typed()
     checkLayoutCombo()
     if modifiers() then
-        for key in pairs(TEXT_KEYS) do keyTriggered(key) end -- keep edge state fresh, type nothing
+        for _, key in ipairs(TEXT_KEY_LIST) do keyTriggered(key) end -- keep edge state fresh, type nothing
         return ""
     end
     local map = input.layout == "ru" and TEXT_RU or TEXT_EN
+    local other = input.layout == "ru" and TEXT_EN or TEXT_RU
     local s = ""
-    for key in pairs(TEXT_KEYS) do
-        if keyTriggered(key) and map[key] then s = s .. map[key] end
+    for _, key in ipairs(TEXT_KEY_LIST) do
+        if keyTriggered(key) then
+            -- Fall back to the other layout's mapping: a key press must never be silently
+            -- dropped just because the layout flipped (e.g. an accidental Alt/Ctrl+Shift combo)
+            -- mid-word.
+            local ch = map[key] or other[key]
+            if ch then s = s .. ch end
+        end
     end
     return s
 end
@@ -222,7 +234,7 @@ function input.beginText(target)
     input.textTarget = target
     input.held = {}
     -- Keys already down (e.g. the Enter that started entry) must not count as new presses.
-    for key in pairs(TEXT_KEYS) do prev["k" .. key] = keyPressed(key) end
+    for _, key in ipairs(TEXT_KEY_LIST) do prev["k" .. key] = keyPressed(key) end
     prev["k" .. Keyboard.KEY_ESCAPE] = keyPressed(Keyboard.KEY_ESCAPE)
     for _, key in ipairs(END_KEYS) do prev["k" .. key] = keyPressed(key) end
     for _, idx in ipairs(controllers()) do
